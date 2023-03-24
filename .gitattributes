@@ -1,0 +1,13 @@
+*.c                 text eol=lf
+*.cpp               text eol=lf
+*.css               text eol=lf
+*.go                text eol=lf
+*.h                 text eol=lf
+*.hpp               text eol=lf
+*.html              text eol=lf
+*.md                text eol=lf
+.gitattributes      text eol=lf
+.gitignore          text eol=lf
+COPYING             text eol=lf
+go.mod              text eol=lf
+go.sum              text eol=lf
