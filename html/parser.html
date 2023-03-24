@@ -1,25 +1,25 @@
 <html>
 <head>
-<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-<link rel="stylesheet" type="text/css" href="style.css" />
-<title>Chapter 3: Parser</title>
+    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <title>Chapter 3: Parser</title>
 </head>
 <body>
 
 <h1>Parser</h1>
 
 <p>
-The next stage in our project is <i>parsing</i>: taking a line of text
-from the user (or elsewhere), and creating the data objects it represents.
-Naturally the user might type something which does not represent an
-object according to our definitions, in which case we must have some way
-to signal an <i>error</i>.
+    The next stage in our project is <i>parsing</i>: taking a line of text
+    from the user (or elsewhere), and creating the data objects it represents.
+    Naturally the user might type something which does not represent an
+    object according to our definitions, in which case we must have some way
+    to signal an <i>error</i>.
 </p>
 
 <h3>Errors</h3>
 
 <p>
-Here is a definition of an <code>Error</code> type:
+    Here is a definition of an <code>Error</code> type:
 <pre class="c">
 typedef enum {
 	Error_OK = 0,
@@ -36,27 +36,27 @@ whether and how something went wrong.
 <h2>Lexer</h2>
 
 <p>
-I have no formal training in CS, but as far as I understand it the idea is
-to split a string up into <i>tokens</i>, which are both "words" and
-"punctuation", and discard any insignificant white space. So if the
-input is:
+    I have no formal training in CS, but as far as I understand it the idea is
+    to split a string up into <i>tokens</i>, which are both "words" and
+    "punctuation", and discard any insignificant white space. So if the
+    input is:
 <pre class="lisp">
 (foo bar)
 </pre>
 Then the four tokens are:
 <table border="1">
-<tr>
- <td><code>(</code></td>
- <td><code>foo</code></td>
- <td><code>bar</code></td>
- <td><code>)</code></td>
-</tr>
+    <tr>
+        <td><code>(</code></td>
+        <td><code>foo</code></td>
+        <td><code>bar</code></td>
+        <td><code>)</code></td>
+    </tr>
 </table>
 </p>
 
 <p>
-So let's start by creating a <i>lexer</i>, which will return the start
-and end of the next token in a string.
+    So let's start by creating a <i>lexer</i>, which will return the start
+    and end of the next token in a string.
 </p>
 
 <pre class="c">
@@ -85,27 +85,27 @@ int lex(const char *str, const char **start, const char **end)
 </pre>
 
 <p>
-If our lexer hits the end of the string without finding a token (ie,
-the remainder of the string is entirely white space), then it will
-return a syntax error and set the start and end to <code>NULL</code>.
+    If our lexer hits the end of the string without finding a token (ie,
+    the remainder of the string is entirely white space), then it will
+    return a syntax error and set the start and end to <code>NULL</code>.
 </p>
 
 <h2>Parser</h2>
 
 <p>
-Now we can think about the parser itself. The entry point
-is <code>read_expr</code>, which will read a single (possibly complex)
-object and return the error status and a pointer to the remainder of
-the input.
+    Now we can think about the parser itself. The entry point
+    is <code>read_expr</code>, which will read a single (possibly complex)
+    object and return the error status and a pointer to the remainder of
+    the input.
 <pre class="c">
 int read_expr(const char *input, const char **end, Atom *result);
 </pre>
 </p>
 
 <p>
-We will first deal with the simple data: integers, symbols and
-<code>NIL</code>. If you have a regex library available then this is
-easy, but it's not too bad in plain C either.
+    We will first deal with the simple data: integers, symbols and
+    <code>NIL</code>. If you have a regex library available then this is
+    easy, but it's not too bad in plain C either.
 </p>
 
 <pre class="c">
@@ -140,26 +140,26 @@ int parse_simple(const char *start, const char *end, Atom *result)
 </pre>
 
 <p>
-Notice two things: first, we are converting the input to upper case.
-This isn't strictly necessary &mdash; there's nothing wrong with having
-a case-sensitive lisp &mdash; but it is the traditional behaviour.
-Secondly, <code>NIL</code> is a special case: it's parsed directly as
-<code>AtomType_Nil</code>, rather than leaving it as a symbol.
+    Notice two things: first, we are converting the input to upper case.
+    This isn't strictly necessary &mdash; there's nothing wrong with having
+    a case-sensitive lisp &mdash; but it is the traditional behaviour.
+    Secondly, <code>NIL</code> is a special case: it's parsed directly as
+    <code>AtomType_Nil</code>, rather than leaving it as a symbol.
 </p>
 
 <p>
-If you're familiar with the various dialects of LISP then you will know
-that <code>NIL</code> is not necessarily the same as <code>()</code>,
-the <i>empty list</i>. We could choose to treat <code>NIL</code> as a
-symbol which evaluates to itself, but for this project we will consider
-both representations to be <em>exactly</em> the same.
+    If you're familiar with the various dialects of LISP then you will know
+    that <code>NIL</code> is not necessarily the same as <code>()</code>,
+    the <i>empty list</i>. We could choose to treat <code>NIL</code> as a
+    symbol which evaluates to itself, but for this project we will consider
+    both representations to be <em>exactly</em> the same.
 </p>
 
 <p>
-Next up are lists (including improper lists and pairs). The simplified
-list syntax makes this a little complicated, so we'll stick it all in a
-helper function. Once again recursion allows us to deal with nested
-lists.
+    Next up are lists (including improper lists and pairs). The simplified
+    list syntax makes this a little complicated, so we'll stick it all in a
+    helper function. Once again recursion allows us to deal with nested
+    lists.
 </p>
 
 <pre class="c">
@@ -218,13 +218,13 @@ int read_list(const char *start, const char **end, Atom *result)
 </pre>
 
 <p>
-I dislike writing infinite loops, but this is the clearest layout I have
-come up with so far. Let me know if you can write a better one!
+    I dislike writing infinite loops, but this is the clearest layout I have
+    come up with so far. Let me know if you can write a better one!
 </p>
 
 <p>
-Finally we have <code>read_expr</code> itself, which is very simple now
-that we have done all of the hard work:
+    Finally we have <code>read_expr</code> itself, which is very simple now
+    that we have done all of the hard work:
 <pre class="c">
 int read_expr(const char *input, const char **end, Atom *result)
 {
@@ -244,15 +244,17 @@ int read_expr(const char *input, const char **end, Atom *result)
 }
 </pre>
 The check for a closing bracket will catch invalid forms such as
-<pre class="lisp">)</pre> and <pre class="lisp">(X .)</pre>
+<pre class="lisp">)</pre>
+and
+<pre class="lisp">(X .)</pre>
 </p>
 
 <h4>Testing</h4>
 
 <p>
-If we use the parser to create a simple read-print loop, then the we
-can type representations of objects on the console and check that they
-are parsed correctly.
+    If we use the parser to create a simple read-print loop, then the we
+    can type representations of objects on the console and check that they
+    are parsed correctly.
 </p>
 
 <pre class="c">
@@ -285,10 +287,10 @@ int main(int argc, char **argv)
 </pre>
 
 <p>
-This version uses the <i>readline</i> library, which shows a prompt
-and reads a line of text from the console. It supports editing beyond
-what a dumb terminal can provide, but a simple wrapper around
-<code>fgets()</code> will do just as well.
+    This version uses the <i>readline</i> library, which shows a prompt
+    and reads a line of text from the console. It supports editing beyond
+    what a dumb terminal can provide, but a simple wrapper around
+    <code>fgets()</code> will do just as well.
 </p>
 
 <pre class="lisp">
@@ -303,9 +305,9 @@ NIL
 </pre>
 
 <p>
-Looks good! Remember that <code>()</code> is exactly the same as
-<code>NIL</code>, and that <code>(X Y)</code> is just another way of
-writing <code>(X . (Y . NIL))</code>.
+    Looks good! Remember that <code>()</code> is exactly the same as
+    <code>NIL</code>, and that <code>(X Y)</code> is just another way of
+    writing <code>(X . (Y . NIL))</code>.
 </p>
 
 </body>

@@ -1,23 +1,23 @@
 <html>
 <head>
-<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-<link rel="stylesheet" type="text/css" href="style.css" />
-<title>Chapter 12: Library</title>
+    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <title>Chapter 12: Library</title>
 </head>
 <body>
 
 <h1>Library</h1>
 
 <p>
-We will now create a small <i>library</i> of useful functions for
-our LISP system. Rather than creating new builtins for each one,
-let's take advantage of the fact that much of the LISP standard
-library can be implemented in LISP itself in terms of lower-level
-fuctions.
+    We will now create a small <i>library</i> of useful functions for
+    our LISP system. Rather than creating new builtins for each one,
+    let's take advantage of the fact that much of the LISP standard
+    library can be implemented in LISP itself in terms of lower-level
+    fuctions.
 </p>
 
 <p>
-First we need a function to read the library definitions from disk.
+    First we need a function to read the library definitions from disk.
 </p>
 
 <pre class="c">
@@ -47,10 +47,10 @@ char *slurp(const char *path)
 </pre>
 
 <p>
-And a routine, similar to our REPL in <code>main</code>, to
-process the definitions. Because we read the whole file in one
-go, there is no problem with splitting definitions over several
-lines.
+    And a routine, similar to our REPL in <code>main</code>, to
+    process the definitions. Because we read the whole file in one
+    go, there is no problem with splitting definitions over several
+    lines.
 </p>
 
 <pre class="c">
@@ -81,7 +81,7 @@ void load_file(Atom env, const char *path)
 </pre>
 
 <p>
-Finally read in the library after setting up the builtins.
+    Finally read in the library after setting up the builtins.
 </p>
 
 <pre class="c">
@@ -108,14 +108,14 @@ int main(int argc, char **argv)
 <h4>Testing</h4>
 
 <p>
-Create <code>library.lisp</code> with the following definition:
+    Create <code>library.lisp</code> with the following definition:
 <pre class="lisp">
 (define (abs x) (if (&lt; x 0) (- x) x))
 </pre>
 </p>
 
 <p>
-And run the interpreter:
+    And run the interpreter:
 <pre class="lisp">
 Reading library.lisp...
 ABS
@@ -129,8 +129,8 @@ without having to define it each time.
 <h2><code>fold</code></h2>
 
 <p>
-<code>foldl</code> and <code>foldr</code> allow us to easily construct
-functions which combine elements of a list.
+    <code>foldl</code> and <code>foldr</code> allow us to easily construct
+    functions which combine elements of a list.
 </p>
 
 <pre class="lisp">
@@ -149,9 +149,9 @@ functions which combine elements of a list.
 </pre>
 
 <p>
-See
-<a href="http://en.wikipedia.org/wiki/Fold_(higher-order_function)">
-the internet</a> for more details.
+    See
+    <a href="http://en.wikipedia.org/wiki/Fold_(higher-order_function)">
+        the internet</a> for more details.
 </p>
 
 <pre class="lisp">
@@ -163,15 +163,15 @@ the internet</a> for more details.
 </pre>
 
 <p>
-<code>list</code> constructs a new list containing its arguments.
-<code>reverse</code> creates a copy of a list with the items in
-reverse order.
+    <code>list</code> constructs a new list containing its arguments.
+    <code>reverse</code> creates a copy of a list with the items in
+    reverse order.
 </p>
 
 <p>
-The recursive definition of <code>LIST</code> requires O(n) stack
-space - a serious implementation would most likely use a more efficient
-version.
+    The recursive definition of <code>LIST</code> requires O(n) stack
+    space - a serious implementation would most likely use a more efficient
+    version.
 </p>
 
 <h4>Testing</h4>
@@ -184,20 +184,20 @@ version.
 </pre>
 
 <p>
-See how much easier this was than implementing the functions as
-builtins.
+    See how much easier this was than implementing the functions as
+    builtins.
 </p>
 
 <h2>More builtins</h2>
 
 <p>
-Some primitive functions require access to the internals of the system.
+    Some primitive functions require access to the internals of the system.
 </p>
 
 <h3><code>apply</code></h3>
 
 <p>
-The <code>apply</code> function:
+    The <code>apply</code> function:
 <pre class="lisp">
 (APPLY <i>fn arg-list</i>)
 </pre>
@@ -226,7 +226,7 @@ int builtin_apply(Atom args, Atom *result)
 <h3><code>eq?</code></h3>
 
 <p>
-<code>eq?</code> tests whether two atoms refer to the same object.
+    <code>eq?</code> tests whether two atoms refer to the same object.
 </p>
 
 <pre class="c">
@@ -273,7 +273,7 @@ int builtin_eq(Atom args, Atom *result)
 <h3><code>pair?</code></h3>
 
 <p>
-Tests whether an atom is a pair.
+    Tests whether an atom is a pair.
 </p>
 
 <pre class="c">
@@ -288,7 +288,7 @@ int builtin_pairp(Atom args, Atom *result)
 </pre>
 
 <p>
-Don't forget to add bindings for these to the initial environment.
+    Don't forget to add bindings for these to the initial environment.
 <pre class="c">
 env_set(env, make_sym("APPLY"), make_builtin(builtin_apply));
 env_set(env, make_sym("EQ?"), make_builtin(builtin_eq));
@@ -299,10 +299,10 @@ env_set(env, make_sym("PAIR?"), make_builtin(builtin_pairp));
 <h2><code>map</code></h2>
 
 <p>
-We can use <code>foldr</code> and <code>apply</code> to implement
-another important function <code>map</code>, which constructs a
-list containing the results of calling an <i>n</i>-ary function
-with the values contained in <i>n</i> lists in turn.
+    We can use <code>foldr</code> and <code>apply</code> to implement
+    another important function <code>map</code>, which constructs a
+    list containing the results of calling an <i>n</i>-ary function
+    with the values contained in <i>n</i> lists in turn.
 </p>
 
 <pre class="lisp">
@@ -320,11 +320,11 @@ with the values contained in <i>n</i> lists in turn.
 </pre>
 
 <p>
-Once again please note that there are alternative implementations.
+    Once again please note that there are alternative implementations.
 </p>
 
 <p>
-It works like this:
+    It works like this:
 </p>
 
 <pre class="lisp">
@@ -333,9 +333,9 @@ It works like this:
 </pre>
 
 <p>
-The result is a list containing the results of evaluating
-<code>(+ 1 4)</code>, <code>(+ 2 5)</code>, and
-<code>(+ 3 6)</code>.
+    The result is a list containing the results of evaluating
+    <code>(+ 1 4)</code>, <code>(+ 2 5)</code>, and
+    <code>(+ 3 6)</code>.
 </p>
 
 </body>

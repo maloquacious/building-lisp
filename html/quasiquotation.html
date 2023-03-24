@@ -1,28 +1,28 @@
 <html>
 <head>
-<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-<link rel="stylesheet" type="text/css" href="style.css" />
-<title>Chapter 13: Quasiquotation</title>
+    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <title>Chapter 13: Quasiquotation</title>
 </head>
 <body>
 
 <h1>Quasiquotation</h1>
 
 <p>
-<code>QUASIQUOTE</code> is an extension of the <code>QUOTE</code>
-special form which is convenient for writing macros.
+    <code>QUASIQUOTE</code> is an extension of the <code>QUOTE</code>
+    special form which is convenient for writing macros.
 </p>
 
 <p>
-For symbols and other simple data, <code>QUASIQUOTE</code> behaves
-like <code>QUOTE</code>, returning the datum unevaluated. Lists
-are also return without being evaluated, with two exceptions. If
-an element of the list (or a sub-list) is of the form
-<code>(UNQUOTE <i>expr</i>)</code>, then <code>expr</code> is
-evaluated and the result inserted into the list in place.
-<code>(UNQUOTE-SPLICING <i>expr</i>)</code> is similar, but the
-result of evaluating <code>expr</code> must be a list, the items
-of which are spliced into the parent list.
+    For symbols and other simple data, <code>QUASIQUOTE</code> behaves
+    like <code>QUOTE</code>, returning the datum unevaluated. Lists
+    are also return without being evaluated, with two exceptions. If
+    an element of the list (or a sub-list) is of the form
+    <code>(UNQUOTE <i>expr</i>)</code>, then <code>expr</code> is
+    evaluated and the result inserted into the list in place.
+    <code>(UNQUOTE-SPLICING <i>expr</i>)</code> is similar, but the
+    result of evaluating <code>expr</code> must be a list, the items
+    of which are spliced into the parent list.
 </p>
 
 <h4>Example</h4>
@@ -38,8 +38,8 @@ evaluates to
 </p>
 
 <p>
-If we define <code>L</code> to be the list <code>(3 4 5)</code>
-then
+    If we define <code>L</code> to be the list <code>(3 4 5)</code>
+    then
 <pre class="lisp">
 (QUASIQUOTE (1 2 (UNQUOTE-SPLICING L)))
 </pre>
@@ -52,28 +52,31 @@ evaluates to
 <h3>Shorthand syntax</h3>
 
 <p>
-Just like <code>QUOTE</code>, we will define the following
-abbreviations.
+    Just like <code>QUOTE</code>, we will define the following
+    abbreviations.
 </p>
 
 <table border="1">
-  <tr><th>Abbreviation</th><th>Equivalent to</th></tr>
-  <tr>
-    <td><code>`<i>expr</i></code></td>
-    <td><code>(QUASIQUOTE <i>expr</i>)</code></td>
-  </tr>
-  <tr>
-    <td><code>,<i>expr</i></code></td>
-    <td><code>(UNQUOTE <i>expr</i>)</code></td>
-  </tr>
-  <tr>
-    <td><code>,@<i>expr</i></code></td>
-    <td><code>(UNQUOTE-SPLICING <i>expr</i>)</code></td>
-  </tr>
+    <tr>
+        <th>Abbreviation</th>
+        <th>Equivalent to</th>
+    </tr>
+    <tr>
+        <td><code>`<i>expr</i></code></td>
+        <td><code>(QUASIQUOTE <i>expr</i>)</code></td>
+    </tr>
+    <tr>
+        <td><code>,<i>expr</i></code></td>
+        <td><code>(UNQUOTE <i>expr</i>)</code></td>
+    </tr>
+    <tr>
+        <td><code>,@<i>expr</i></code></td>
+        <td><code>(UNQUOTE-SPLICING <i>expr</i>)</code></td>
+    </tr>
 </table>
 
 <p>
-Rewriting the examples above with this syntax gives
+    Rewriting the examples above with this syntax gives
 <pre class="lisp">
 `(+ 1 ,(+ 2 3))
 </pre>
@@ -86,7 +89,7 @@ and
 <h4>Implementation</h4>
 
 <p>
-We extend the lexer to understand the additional special tokens.
+    We extend the lexer to understand the additional special tokens.
 </p>
 
 <pre class="c">
@@ -117,8 +120,8 @@ int lex(const char *str, const char **start, const char **end)
 </pre>
 
 <p>
-<code>read_expr</code> must expand the abbreviations in the same
-way as <code>QUOTE</code>
+    <code>read_expr</code> must expand the abbreviations in the same
+    way as <code>QUOTE</code>
 </p>
 
 <pre class="c">
@@ -148,8 +151,8 @@ int read_expr(const char *input, const char **end, Atom *result)
 </pre>
 
 <p>
-The <code>QUASIQUOTE</code> operator itself may be defined as a macro.
-First we need a few helper functions.
+    The <code>QUASIQUOTE</code> operator itself may be defined as a macro.
+    First we need a few helper functions.
 </p>
 
 <pre class="lisp">
@@ -161,12 +164,12 @@ First we need a few helper functions.
 </pre>
 
 <p>
-<code>(append <i>a b</i>)</code> concatenates the lists <code>a</code>
-and <code>b</code>.
+    <code>(append <i>a b</i>)</code> concatenates the lists <code>a</code>
+    and <code>b</code>.
 </p>
 
 <p>
-And now the macro itself:
+    And now the macro itself:
 </p>
 
 <pre class="lisp">
@@ -185,15 +188,15 @@ And now the macro itself:
 </pre>
 
 <p>
-The definition above is a little hard to follow, since the
-resulting expression must be built up using <code>LIST</code>
-and may include additional calls to <code>QUASIQUOTE</code>.
+    The definition above is a little hard to follow, since the
+    resulting expression must be built up using <code>LIST</code>
+    and may include additional calls to <code>QUASIQUOTE</code>.
 </p>
 
 <p>
-Quasiquotation allows us to make the body of a macro look like
-the expression it returns; for example the <code>IGNORE</code>
-macro in chapter 11
+    Quasiquotation allows us to make the body of a macro look like
+    the expression it returns; for example the <code>IGNORE</code>
+    macro in chapter 11
 <pre class="lisp">
 (DEFMACRO (IGNORE X)
   (CONS 'QUOTE (CONS X NIL)))
@@ -220,8 +223,8 @@ L
 <h2><code>let</code></h2>
 
 <p>
-We will now use <code>QUASIQUOTE</code> to define a new special
-form:
+    We will now use <code>QUASIQUOTE</code> to define a new special
+    form:
 <pre class="lisp">
 (LET ((<i>sym1 expr1</i>)
       (<i>sym2 expr2</i>)
@@ -231,15 +234,15 @@ form:
 </p>
 
 <p>
-<code>LET</code> causes the expressions <code>expr</code> to be evaluated
-with the symbols <code>sym1</code>, <code>sym2</code>... bound to the
-result of evaluating <code>expr1</code>, <code>expr2</code> and so on.
-The result of the last expression <code>body</code> to be evaluated
-is returned.
+    <code>LET</code> causes the expressions <code>expr</code> to be evaluated
+    with the symbols <code>sym1</code>, <code>sym2</code>... bound to the
+    result of evaluating <code>expr1</code>, <code>expr2</code> and so on.
+    The result of the last expression <code>body</code> to be evaluated
+    is returned.
 </p>
 
 <p>
-The definition is simple.
+    The definition is simple.
 </p>
 
 <pre class="lisp">
@@ -251,7 +254,7 @@ The definition is simple.
 <h4>Example</h4>
 
 <p>
-When we evaluate the form
+    When we evaluate the form
 <pre class="lisp">
 (LET ((X 3) (Y 5)) (+ X Y))
 </pre>
@@ -272,15 +275,15 @@ Symbol not bound
 </pre>
 
 <p>
-The <code>LET</code> expression clarifies the programmer's
-intent to make temporary definitions.
+    The <code>LET</code> expression clarifies the programmer's
+    intent to make temporary definitions.
 </p>
 
 <h3>A trick</h3>
 
 <p>
-We can use <code>LET</code> to extend the built-in binary operator
-<code>+</code> to accept any number of arguments.
+    We can use <code>LET</code> to extend the built-in binary operator
+    <code>+</code> to accept any number of arguments.
 </p>
 
 <pre class="lisp">
@@ -290,8 +293,8 @@ We can use <code>LET</code> to extend the built-in binary operator
 </pre>
 
 <p>
-Compare this with the definition of <code>ADD</code> add the end
-of chapter 10.
+    Compare this with the definition of <code>ADD</code> add the end
+    of chapter 10.
 </p>
 
 <h4>Testing</h4>
@@ -302,8 +305,8 @@ of chapter 10.
 </pre>
 
 <p>
-We didn't have to touch <code>builtin_add</code> or even recompile
-the interpreter.
+    We didn't have to touch <code>builtin_add</code> or even recompile
+    the interpreter.
 </p>
 
 </body>

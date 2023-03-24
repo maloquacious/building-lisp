@@ -1,56 +1,56 @@
 <html>
 <head>
-<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-<link rel="stylesheet" type="text/css" href="style.css" />
-<title>Chapter 7: Lambda expressions and closures</title>
+    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <title>Chapter 7: Lambda expressions and closures</title>
 </head>
 <body>
 
 <h1>Lambda expressions and closures</h1>
 
 <p>
-This is where things start to get interesting. We will now implement
-support for <i>lambda expressions</i>, a way to build functions dynamically
-out of the LISP expressions we can already deal with.
+    This is where things start to get interesting. We will now implement
+    support for <i>lambda expressions</i>, a way to build functions dynamically
+    out of the LISP expressions we can already deal with.
 </p>
 
 <p>
-A lambda expression is a list expression with a particular syntax:
+    A lambda expression is a list expression with a particular syntax:
 <pre class="lisp">
 (LAMBDA (<i>arg...</i>) <i>expr...</i>)
 </pre>
 </p>
 
 <p>
-The result of evaluating a <code>LAMBDA</code> expression is a new
-kind of object which we will call a <i>closure</i>. A closure can be used
-in list expressions in the same way as a built-in function. In this case
-the arguments will be bound to the symbols listed as <code>arg...</code>
-in the lambda expression. The <i>body</i> of the function consists of the
-expressions <code>expr...</code>, which will be evaluated in turn. The result
-of evaluating the final expression is the result of applying the arguments
-to the closure.
+    The result of evaluating a <code>LAMBDA</code> expression is a new
+    kind of object which we will call a <i>closure</i>. A closure can be used
+    in list expressions in the same way as a built-in function. In this case
+    the arguments will be bound to the symbols listed as <code>arg...</code>
+    in the lambda expression. The <i>body</i> of the function consists of the
+    expressions <code>expr...</code>, which will be evaluated in turn. The result
+    of evaluating the final expression is the result of applying the arguments
+    to the closure.
 </p>
 
 <p>
-That's a pretty dense definition, so here is an example of how we would
-like to use lambda expressions:
+    That's a pretty dense definition, so here is an example of how we would
+    like to use lambda expressions:
 <pre class="lisp">
 (DEFINE SQUARE (LAMBDA (X) (* X X)))
 </pre>
 </p>
 
 <p>
-<code>SQUARE</code> should now be a function of one argument
-<code>X</code>, which returns the result of evaluating
-<code>(* X X)</code>. Thus evaluating <code>(SQUARE 3)</code>
-should return <code>9</code>.
+    <code>SQUARE</code> should now be a function of one argument
+    <code>X</code>, which returns the result of evaluating
+    <code>(* X X)</code>. Thus evaluating <code>(SQUARE 3)</code>
+    should return <code>9</code>.
 </p>
 
 <h4>Implementation</h4>
 
 <p>
-We will represent the closure using a list:
+    We will represent the closure using a list:
 <pre class="lisp">
 (<i>env</i> (<i>arg...</i>) <i>expr...</i>)
 </pre>
@@ -62,8 +62,8 @@ having to pass them as arguments. For example, recall that
 </p>
 
 <p>
-The first task is to add a new constant for the <code>type</code> field
-of our <code>Atom</code> structure:
+    The first task is to add a new constant for the <code>type</code> field
+    of our <code>Atom</code> structure:
 <pre class="c">
 struct Atom {
 	enum {
@@ -85,9 +85,9 @@ to <code>value</code>.
 </p>
 
 <p>
-Like our other atom types, we will create a utility function to
-initialize them. <code>make_closure</code>, unlike the others, performs
-some validation of the arguments and so needs to return an error code.
+    Like our other atom types, we will create a utility function to
+    initialize them. <code>make_closure</code>, unlike the others, performs
+    some validation of the arguments and so needs to return an error code.
 </p>
 
 <pre class="c">
@@ -114,8 +114,8 @@ int make_closure(Atom env, Atom args, Atom body, Atom *result)
 </pre>
 
 <p>
-Next up is another special case in <code>eval</code> to create a
-closure whenever a lambda expression is encountered.
+    Next up is another special case in <code>eval</code> to create a
+    closure whenever a lambda expression is encountered.
 </p>
 
 <pre class="c">
@@ -143,9 +143,9 @@ int eval_expr(Atom expr, Atom env, Atom *result)
 </pre>
 
 <p>
-The body of our <code>SQUARE</code> example above is expressed in terms
-of <code>X</code>. In order to evaluate the body, we need to create a new
-environment with <code>X</code> bound to the value of the argument:
+    The body of our <code>SQUARE</code> example above is expressed in terms
+    of <code>X</code>. In order to evaluate the body, we need to create a new
+    environment with <code>X</code> bound to the value of the argument:
 <pre class="lisp">
 (<i>closure-env</i> (X . 3))
 </pre>
@@ -154,8 +154,8 @@ that was stored in the closure.
 </p>
 
 <p>
-Finally we extend <code>apply</code> to create the new environment and
-call <code>eval</code> for each expression in the body.
+    Finally we extend <code>apply</code> to create the new environment and
+    call <code>eval</code> for each expression in the body.
 </p>
 
 <pre class="c">
@@ -198,7 +198,7 @@ int apply(Atom fn, Atom args, Atom *result)
 <h4>Testing</h4>
 
 <p>
-Let's check that our <code>SQUARE</code> function works as intended.
+    Let's check that our <code>SQUARE</code> function works as intended.
 </p>
 
 <pre class="lisp">
@@ -211,8 +211,8 @@ SQUARE
 </pre>
 
 <p>
-Of course, lambda expressions do not have to be bound to a symbol &mdash;
-we can create <i>anonymous functions</i>.
+    Of course, lambda expressions do not have to be bound to a symbol &mdash;
+    we can create <i>anonymous functions</i>.
 </p>
 
 <pre class="lisp">
@@ -221,8 +221,8 @@ we can create <i>anonymous functions</i>.
 </pre>
 
 <p>
-Fans of functional programming will be pleased to see that we can now
-do this kind of thing:
+    Fans of functional programming will be pleased to see that we can now
+    do this kind of thing:
 </p>
 
 <pre class="lisp">
@@ -235,7 +235,7 @@ ADD-TWO
 </pre>
 
 <p>
-Do you know where the value "2" is stored?
+    Do you know where the value "2" is stored?
 </p>
 
 </body>

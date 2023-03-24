@@ -1,27 +1,27 @@
 <html>
 <head>
-<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-<link rel="stylesheet" type="text/css" href="style.css" />
-<title>Chapter 11: Macros</title>
+    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <title>Chapter 11: Macros</title>
 </head>
 <body>
 
 <h1>Macros</h1>
 
 <p>
-Macros allow you to create new special forms at runtime. Unlike a
-function, the arguments to a macro are <em>not</em> evaluated. The
-result of evaluating the body of the macro is then itself evaluated.
+    Macros allow you to create new special forms at runtime. Unlike a
+    function, the arguments to a macro are <em>not</em> evaluated. The
+    result of evaluating the body of the macro is then itself evaluated.
 </p>
 
 <p>
-Note: these are (essentially) <i>Common LISP</i> macros. Scheme has a
-different macro system, which avoids problems with identifiers
-introduced by the macro, but is more complex.
+    Note: these are (essentially) <i>Common LISP</i> macros. Scheme has a
+    different macro system, which avoids problems with identifiers
+    introduced by the macro, but is more complex.
 </p>
 
 <p>
-We will define macros using the following syntax:
+    We will define macros using the following syntax:
 <pre class="lisp">
 (DEFMACRO (<i>name arg...</i>) <i>body...</i>)
 </pre>
@@ -32,7 +32,7 @@ slightly different from the form used in Common LISP.
 <h4>Example</h4>
 
 <p>
-Take the macro <code>IGNORE</code> defined by:
+    Take the macro <code>IGNORE</code> defined by:
 <pre class="lisp">
 (DEFMACRO (IGNORE X)
   (CONS 'QUOTE
@@ -41,7 +41,7 @@ Take the macro <code>IGNORE</code> defined by:
 </p>
 
 <p>
-If we then evaluate the expression
+    If we then evaluate the expression
 <pre class="lisp">
 (IGNORE FOO)
 </pre>
@@ -66,7 +66,7 @@ FOO
 <h4>Implementation</h4>
 
 <p>
-We will define a new type of atom:
+    We will define a new type of atom:
 <pre class="c">
 AtomType_Macro
 </pre>
@@ -74,8 +74,8 @@ the value of which is the same as <code>AtomType_Closure</code>.
 </p>
 
 <p>
-And now simply teach <code>eval_expr</code> about our new macro
-type.
+    And now simply teach <code>eval_expr</code> about our new macro
+    type.
 </p>
 
 <pre class="c">
@@ -148,7 +148,7 @@ Symbol not bound
 </pre>
 
 <p>
-We will use macros in the future to define some new special forms.
+    We will use macros in the future to define some new special forms.
 </p>
 
 </body>

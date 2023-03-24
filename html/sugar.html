@@ -1,16 +1,16 @@
 <html>
 <head>
-<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-<link rel="stylesheet" type="text/css" href="style.css" />
-<title>Chapter 9: Syntactic sugar</title>
+    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <title>Chapter 9: Syntactic sugar</title>
 </head>
 <body>
 
 <h1>Syntactic sugar</h1>
 
 <p>
-We will define some additional syntax to facilitate entry of some common
-expressions. Recall that we already allow the user to enter
+    We will define some additional syntax to facilitate entry of some common
+    expressions. Recall that we already allow the user to enter
 <pre class="lisp">
 (A B C)
 </pre>
@@ -23,9 +23,9 @@ instead of
 <h2>Quoting</h2>
 
 <p>
-In order to include a literal symbol or list in an expression, we need
-to use the <code>QUOTE</code> operator. As a shortcut, we will
-define
+    In order to include a literal symbol or list in an expression, we need
+    to use the <code>QUOTE</code> operator. As a shortcut, we will
+    define
 <pre class="lisp">
 'EXPR
 </pre>
@@ -36,32 +36,34 @@ to be equivalent to
 </p>
 
 <p>
-So for example the following forms are equivalent:
+    So for example the following forms are equivalent:
 <table border="1">
-  <tr>
-    <th>Abbreviation</th> <th>Canonical form</th> <th>Evaluates to</th>
-  <tr>
-    <td><code>'FOO</code></td>
-    <td><code>(QUOTE FOO)</code></td>
-    <td><code>FOO</code></td>
-  </tr>
-  <tr>
-    <td><code>'(+ 1 2)</code></td>
-    <td><code>(QUOTE (+ 1 2))</code></td>
-    <td><code>(+ 1 2)</code></td>
-  </tr>
-  <tr>
-    <td><code>'(A . B)</code></td>
-    <td><code>(QUOTE (A . B))</code></td>
-    <td><code>(A . B)</code></td>
-  </tr>
+    <tr>
+        <th>Abbreviation</th>
+        <th>Canonical form</th>
+        <th>Evaluates to</th>
+    <tr>
+        <td><code>'FOO</code></td>
+        <td><code>(QUOTE FOO)</code></td>
+        <td><code>FOO</code></td>
+    </tr>
+    <tr>
+        <td><code>'(+ 1 2)</code></td>
+        <td><code>(QUOTE (+ 1 2))</code></td>
+        <td><code>(+ 1 2)</code></td>
+    </tr>
+    <tr>
+        <td><code>'(A . B)</code></td>
+        <td><code>(QUOTE (A . B))</code></td>
+        <td><code>(A . B)</code></td>
+    </tr>
 </table>
 </p>
 
 <p>
-The lexer needs to know that the quote mark is a prefix (i.e., it can
-appear immediately before another token but is not necessarily a
-delimeter).
+    The lexer needs to know that the quote mark is a prefix (i.e., it can
+    appear immediately before another token but is not necessarily a
+    delimeter).
 <pre class="c">
 int lex(const char *str, const char **start, const char **end)
 {
@@ -76,8 +78,8 @@ int lex(const char *str, const char **start, const char **end)
 </p>
 
 <p>
-Also <code>read_expr</code> must convert it to the correct list
-expresssion.
+    Also <code>read_expr</code> must convert it to the correct list
+    expresssion.
 </p>
 
 <pre class="c">
@@ -123,9 +125,9 @@ BAR
 <h2>Function definitions</h2>
 
 <p>
-It is cumbersome to have to type a lambda expression every time we wish
-to define a function, so we will modify the <code>DEFINE</code> operator
-to avoid this.
+    It is cumbersome to have to type a lambda expression every time we wish
+    to define a function, so we will modify the <code>DEFINE</code> operator
+    to avoid this.
 <pre class="lisp">
 (DEFINE (<i>name args...</i>) <i>body...</i>)
 </pre>
@@ -136,7 +138,7 @@ is equivalent to
 </p>
 
 <p>
-Here's how:
+    Here's how:
 </p>
 
 <pre class="c">
@@ -197,7 +199,7 @@ SQUARE
 </pre>
 
 <p>
-Sweet!
+    Sweet!
 </p>
 
 </body>

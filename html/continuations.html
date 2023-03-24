@@ -1,36 +1,36 @@
 <html>
 <head>
-<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-<link rel="stylesheet" type="text/css" href="style.css" />
-<title>Chapter 14: Continuations and tail recursion</title>
+    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <title>Chapter 14: Continuations and tail recursion</title>
 </head>
 <body>
 
 <i>
-<strong>NOTE</strong> The implementation of <code>eval_expr</code>
-and the design of the stack in this chapter are rather ad-hoc, and
-I'm not particularly proud of them. Please skip to the next chapter
-if they offend you.
+    <strong>NOTE</strong> The implementation of <code>eval_expr</code>
+    and the design of the stack in this chapter are rather ad-hoc, and
+    I'm not particularly proud of them. Please skip to the next chapter
+    if they offend you.
 </i>
 
 <h1>Continuations and tail recursion</h1>
 
 <p>
-Our <code>eval_expr</code> function has been implemented recursively
-&mdash; that is to say, when in the course of evaluating an expression
-it is necessary to evaluate a sub-expression, <code>eval_expr</code>
-calls itself to obtain the result.
+    Our <code>eval_expr</code> function has been implemented recursively
+    &mdash; that is to say, when in the course of evaluating an expression
+    it is necessary to evaluate a sub-expression, <code>eval_expr</code>
+    calls itself to obtain the result.
 </p>
 
 <p>
-This works fairly well, and is easy to follow, but the depth of
-recursion in our LISP environment is limited by the stack size of the
-interpreter. LISP code traditionally makes heavy use of recursion,
-and we would like to support this up to the limit of available memory.
+    This works fairly well, and is easy to follow, but the depth of
+    recursion in our LISP environment is limited by the stack size of the
+    interpreter. LISP code traditionally makes heavy use of recursion,
+    and we would like to support this up to the limit of available memory.
 </p>
 
 <p>
-Take the following pathological example:
+    Take the following pathological example:
 <pre class="lisp">
 (define (count n)
   (if (= n 0)
@@ -40,46 +40,46 @@ Take the following pathological example:
 </p>
 
 <p>
-The <code>COUNT</code> function will recurse to depth <code>n</code>
-and return the sum of <code>n</code> ones. Expressions such as
-<code>(COUNT 10)</code> should compute OK with our current interpreter,
-but even <code>(COUNT 10000)</code> is enough to cause a stack overflow
-on my machine.
+    The <code>COUNT</code> function will recurse to depth <code>n</code>
+    and return the sum of <code>n</code> ones. Expressions such as
+    <code>(COUNT 10)</code> should compute OK with our current interpreter,
+    but even <code>(COUNT 10000)</code> is enough to cause a stack overflow
+    on my machine.
 </p>
 
 <p>
-To achieve this we will rewrite <code>eval_expr</code> as a loop, with
-helper functions to keep track of evaluations in progress and return
-the next expression to be evaluated. When there are no more expressions
-left, <code>eval_expr</code> can return the final result to the caller.
+    To achieve this we will rewrite <code>eval_expr</code> as a loop, with
+    helper functions to keep track of evaluations in progress and return
+    the next expression to be evaluated. When there are no more expressions
+    left, <code>eval_expr</code> can return the final result to the caller.
 </p>
 
 <p>
-As <code>eval_expr</code> works through the tree of expressions, we will
-keep track of arguments evaluated and pending evaluation in a series of
-<code>frames</code>, linked together to form a <code>stack</code>. This
-is broadly the same way that the compiled version of the recursive
-<code>eval_expr</code> works; in this case we are replacing the machine
-code stack with a LISP data structure and manipulating it explicitly.
+    As <code>eval_expr</code> works through the tree of expressions, we will
+    keep track of arguments evaluated and pending evaluation in a series of
+    <code>frames</code>, linked together to form a <code>stack</code>. This
+    is broadly the same way that the compiled version of the recursive
+    <code>eval_expr</code> works; in this case we are replacing the machine
+    code stack with a LISP data structure and manipulating it explicitly.
 </p>
 
 <p>
-The stack can also be thought of as representing the future of the
-computation once the present expression has been evaluated. In this
-sense it is referred to as the current <i>continuation</i>.
+    The stack can also be thought of as representing the future of the
+    computation once the present expression has been evaluated. In this
+    sense it is referred to as the current <i>continuation</i>.
 </p>
 
 <p>
-Since any function which is called by <code>eval_expr</code> may not
-call <code>eval_expr</code> (to avoid recursion), we must integrate
-<code>apply</code> and <code>builtin_apply</code> into the body of
-<code>eval_expr</code>.
+    Since any function which is called by <code>eval_expr</code> may not
+    call <code>eval_expr</code> (to avoid recursion), we must integrate
+    <code>apply</code> and <code>builtin_apply</code> into the body of
+    <code>eval_expr</code>.
 </p>
 
 <h4>Implementation</h4>
 
 <p>
-A stack frame has the following form.
+    A stack frame has the following form.
 </p>
 
 <pre class="lisp">
@@ -87,20 +87,20 @@ A stack frame has the following form.
 </pre>
 
 <p>
-<code>parent</code> is the stack frame corresponding to the parent
-expression (that is, the one which is waiting for the result of the
-current expression). <code>env</code> is the current environment,
-<code>evaluated-op</code> is the evaluated operator, and
-<code>pending-arg...</code> and <code>evaluated-arg</code> are the
-arguments pending and following evaluation respectively.
-<code>body...</code> are the expressions in the function body
-which are pending execution.
+    <code>parent</code> is the stack frame corresponding to the parent
+    expression (that is, the one which is waiting for the result of the
+    current expression). <code>env</code> is the current environment,
+    <code>evaluated-op</code> is the evaluated operator, and
+    <code>pending-arg...</code> and <code>evaluated-arg</code> are the
+    arguments pending and following evaluation respectively.
+    <code>body...</code> are the expressions in the function body
+    which are pending execution.
 </p>
 
 <p>
-Rather than writing out long lists of <code>car()</code> and
-<code>cdr()</code>, we will define some helper functions to
-manipulate members of a list.
+    Rather than writing out long lists of <code>car()</code> and
+    <code>cdr()</code>, we will define some helper functions to
+    manipulate members of a list.
 </p>
 
 <pre class="c">
@@ -132,9 +132,9 @@ void list_reverse(Atom *list)
 </pre>
 
 <p>
-Another function creates a new stack frame ready to start evaluating a
-new function call, with the specified parent, environment and list of
-arguments pending evaluation (the <i>tail</i>).
+    Another function creates a new stack frame ready to start evaluating a
+    new function call, with the specified parent, environment and list of
+    arguments pending evaluation (the <i>tail</i>).
 </p>
 
 <pre class="c">
@@ -151,9 +151,9 @@ Atom make_frame(Atom parent, Atom env, Atom tail)
 </pre>
 
 <p>
-Here is the innermost part of our new <code>exec_expr</code>,
-which sets <code>expr</code> to the next part of the function
-body, and pops the stack when we have reached end of the body.
+    Here is the innermost part of our new <code>exec_expr</code>,
+    which sets <code>expr</code> to the next part of the function
+    body, and pops the stack when we have reached end of the body.
 </p>
 
 <pre class="c">
@@ -177,9 +177,9 @@ int eval_do_exec(Atom *stack, Atom *expr, Atom *env)
 </pre>
 
 <p>
-This helper binds the function arguments into a new environment
-if they have not already been bound, then calls
-<code>eval_do_exec</code> to get the next expression in the body.
+    This helper binds the function arguments into a new environment
+    if they have not already been bound, then calls
+    <code>eval_do_exec</code> to get the next expression in the body.
 </p>
 
 <pre class="c">
@@ -224,9 +224,9 @@ int eval_do_bind(Atom *stack, Atom *expr, Atom *env)
 </pre>
 
 <p>
-The next function is called once all arguments have been evaluated,
-and is responsible either generating an expression to call a builtin,
-or delegating to <code>eval_do_bind</code>.
+    The next function is called once all arguments have been evaluated,
+    and is responsible either generating an expression to call a builtin,
+    or delegating to <code>eval_do_bind</code>.
 </p>
 
 <pre class="c">
@@ -270,10 +270,10 @@ int eval_do_apply(Atom *stack, Atom *expr, Atom *env, Atom *result)
 </pre>
 
 <p>
-This part is called once an expression has been evaluated, and
-is responsible for storing the result, which is either an operator,
-an argument, or an intermediate body expression, and fetching the
-next expression to evaluate.
+    This part is called once an expression has been evaluated, and
+    is responsible for storing the result, which is either an operator,
+    an argument, or an intermediate body expression, and fetching the
+    next expression to evaluate.
 </p>
 
 <pre class="c">
@@ -346,9 +346,9 @@ int eval_do_return(Atom *stack, Atom *expr, Atom *env, Atom *result)
 </pre>
 
 <p>
-And here we are at last with the new <code>eval_expr</code>. There
-is a lot of code for setting up special forms, but the rest is simply
-a loop waiting for the stack to clear.
+    And here we are at last with the new <code>eval_expr</code>. There
+    is a lot of code for setting up special forms, but the rest is simply
+    a loop waiting for the stack to clear.
 </p>
 
 <pre class="c">
@@ -471,7 +471,7 @@ int eval_expr(Atom expr, Atom env, Atom *result)
 <h4>Testing</h4>
 
 <p>
-Let's try our <code>COUNT</code> function again.
+    Let's try our <code>COUNT</code> function again.
 </p>
 
 <pre class="lisp">
@@ -480,30 +480,30 @@ Let's try our <code>COUNT</code> function again.
 </pre>
 
 <p>
-Hooray! We can now recurse as much as we like without causing a stack
-overflow. If you have a lot of RAM, you should even be able to do
-a million levels deep.
+    Hooray! We can now recurse as much as we like without causing a stack
+    overflow. If you have a lot of RAM, you should even be able to do
+    a million levels deep.
 </p>
 
 <h2>Tail recursion</h2>
 
 <p>
-If the last expression in a function is a call to another function, then
-the result can be returned directly to the first function's caller. This
-is known as a <i>tail call</i>. If the called function, through a series
-of tail calls, causes the first function to be called, we have
-<i>tail recursion</i>.
+    If the last expression in a function is a call to another function, then
+    the result can be returned directly to the first function's caller. This
+    is known as a <i>tail call</i>. If the called function, through a series
+    of tail calls, causes the first function to be called, we have
+    <i>tail recursion</i>.
 </p>
 
 <p>
-Tail calls do not require the caller's stack frame to be retained, so
-a tail-recursive function can recurse as many levels as necessary without
-increasing the stack depth.
+    Tail calls do not require the caller's stack frame to be retained, so
+    a tail-recursive function can recurse as many levels as necessary without
+    increasing the stack depth.
 </p>
 
 <p>
-The <code>count</code> function could be formulated as a tail-recursive
-procedure as follows:
+    The <code>count</code> function could be formulated as a tail-recursive
+    procedure as follows:
 <pre class="lisp">
 (define (count n a)
   (if (= n 0)
@@ -515,13 +515,13 @@ procedure as follows:
 </p>
 
 <p>
-If you watch <code>eval_expr</code> with a debugger you can confirm that
-the stack never grows above a few levels deep.
+    If you watch <code>eval_expr</code> with a debugger you can confirm that
+    the stack never grows above a few levels deep.
 </p>
 
 <p>
-All that is left to do is clean up all the temporary objects created
-by our new evaluator.
+    All that is left to do is clean up all the temporary objects created
+    by our new evaluator.
 </p>
 
 </body>

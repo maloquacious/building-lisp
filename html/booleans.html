@@ -1,8 +1,8 @@
 <html>
 <head>
-<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-<link rel="stylesheet" type="text/css" href="style.css" />
-<title>Chapter 8: Booleans and short-circuit evaluation</title>
+    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <title>Chapter 8: Booleans and short-circuit evaluation</title>
 </head>
 <body>
 
@@ -11,34 +11,34 @@
 <h2>Booleans</h2>
 
 <p>
-(Apologies if you are a logician and I've got this all wrong...)
+    (Apologies if you are a logician and I've got this all wrong...)
 </p>
 
 <p>
-A <i>boolean</i> value is one of two classes of values which are called
-<i>true</i> and <i>false</i>. If we wish to interpret a value as a boolean,
-we consider it to be <i>true</i> if it is in the class of <i>true</i> values,
-and <i>false</i> otherwise.
+    A <i>boolean</i> value is one of two classes of values which are called
+    <i>true</i> and <i>false</i>. If we wish to interpret a value as a boolean,
+    we consider it to be <i>true</i> if it is in the class of <i>true</i> values,
+    and <i>false</i> otherwise.
 </p>
 
 <h2>Short-circuit evalutaion</h2>
 
 <p>
-So far every expression we pass to <code>eval</code> is evaluated. With
-the exception of special forms such as <code>DEFINE</code> and
-<code>LAMBDA</code>, which store away expressions to be evaluated
-later, <code>eval</code> must walk the whole tree before returning a
-result.
+    So far every expression we pass to <code>eval</code> is evaluated. With
+    the exception of special forms such as <code>DEFINE</code> and
+    <code>LAMBDA</code>, which store away expressions to be evaluated
+    later, <code>eval</code> must walk the whole tree before returning a
+    result.
 </p>
 
 <p>
-In this chapter we will define yet another special form <code>IF</code>,
-which will cause <code>eval</code> to choose which of two possible
-expressions to evaluate, and discard the other.
+    In this chapter we will define yet another special form <code>IF</code>,
+    which will cause <code>eval</code> to choose which of two possible
+    expressions to evaluate, and discard the other.
 </p>
 
 <p>
-The syntax is as follows:
+    The syntax is as follows:
 <pre class="lisp">
 (IF <i>test true-expr false-expr</i>)
 </pre>
@@ -52,12 +52,12 @@ other expression is ignored.
 </p>
 
 <p>
-But what kind of value is <i>true</i>? In our environment we will define
-<code>NIL</code> to be <i>false</i>. Any other value is <i>true</i>.
+    But what kind of value is <i>true</i>? In our environment we will define
+    <code>NIL</code> to be <i>false</i>. Any other value is <i>true</i>.
 </p>
 
 <p>
-Here is the code to handle IF-expressions.
+    Here is the code to handle IF-expressions.
 </p>
 
 <pre class="c">
@@ -93,23 +93,23 @@ int eval_expr(Atom expr, Atom env, Atom *result)
 </pre>
 
 <p>
-The argument check is getting a little unwieldy. A couple of alternatives
-are to modify <code>car</code> and <code>cdr</code> to return
-<code>NIL</code> if the argument is not a pair and forego the syntax
-check, or to create a helper function to count the list length. It won't
-get any worse than this, though &mdash; so let's not waste time on it.
+    The argument check is getting a little unwieldy. A couple of alternatives
+    are to modify <code>car</code> and <code>cdr</code> to return
+    <code>NIL</code> if the argument is not a pair and forego the syntax
+    check, or to create a helper function to count the list length. It won't
+    get any worse than this, though &mdash; so let's not waste time on it.
 </p>
 
 <p>
-Traditionally LISP functions return the symbol <code>T</code> if they
-need to return a boolean value and there is no obvious object available.
-<code>T</code> is bound to itself, so evaluating it returns the symbol
-<code>T</code> again. A symbol is not <code>NIL</code>, and so is
-<i>true</i>.
+    Traditionally LISP functions return the symbol <code>T</code> if they
+    need to return a boolean value and there is no obvious object available.
+    <code>T</code> is bound to itself, so evaluating it returns the symbol
+    <code>T</code> again. A symbol is not <code>NIL</code>, and so is
+    <i>true</i>.
 </p>
 
 <p>
-Add a binding for <code>T</code> to the initial environment:
+    Add a binding for <code>T</code> to the initial environment:
 <pre class="c">
 env_set(env, make_sym("T"), make_sym("T"));
 </pre>
@@ -129,26 +129,26 @@ T
 </pre>
 
 <p>
-Unlike C, zero is <i>true</i>, not <i>false</i>.
+    Unlike C, zero is <i>true</i>, not <i>false</i>.
 </p>
 
 <h2>Predicates</h2>
 
 <p>
-While we could stop here, it would be useful to make some tests other
-than "is it <code>NIL</code>". This is where <i>predicates</i> come in.
-A predicate is a function which returns a true/false value according to
-some condition.
+    While we could stop here, it would be useful to make some tests other
+    than "is it <code>NIL</code>". This is where <i>predicates</i> come in.
+    A predicate is a function which returns a true/false value according to
+    some condition.
 </p>
 
 <p>
-We will define two built-in predicates, "<code>=</code>" which tests for
-numerical equality, and "<code>&lt;</code>" which tests if one number
-is less than another.
+    We will define two built-in predicates, "<code>=</code>" which tests for
+    numerical equality, and "<code>&lt;</code>" which tests if one number
+    is less than another.
 </p>
 
 <p>
-The functions are similar to our other numerical built-ins.
+    The functions are similar to our other numerical built-ins.
 </p>
 
 <pre class="c">
@@ -172,11 +172,11 @@ int builtin_numeq(Atom args, Atom *result)
 </pre>
 
 <p>
-<code>builtin_less</code> follows the same pattern and is not shown here.
+    <code>builtin_less</code> follows the same pattern and is not shown here.
 </p>
 
 <p>
-Finally we must add them to the initial environment.
+    Finally we must add them to the initial environment.
 </p>
 
 <pre class="c">
@@ -194,14 +194,14 @@ NIL
 </pre>
 
 <p>
-Barring memory and stack limitations, our LISP environment is now
-Turing-complete! If you have been entering the code as we go along, you
-can confirm that we have implemented the core of a usable programming
-language in well under 1,000 lines of C code.
+    Barring memory and stack limitations, our LISP environment is now
+    Turing-complete! If you have been entering the code as we go along, you
+    can confirm that we have implemented the core of a usable programming
+    language in well under 1,000 lines of C code.
 </p>
 
 <p>
-A classic demonstration:
+    A classic demonstration:
 <pre class="lisp">
 &gt; <b>(define fact
     (lambda (x)
@@ -218,9 +218,9 @@ multi-line expressions, so you must enter the definition for
 </p>
 
 <p>
-There is more to do yet, though. LISP has other features which make it
-possible to express some really interesting stuff, and there are a few loose
-ends to tidy up as well.
+    There is more to do yet, though. LISP has other features which make it
+    possible to express some really interesting stuff, and there are a few loose
+    ends to tidy up as well.
 </p>
 
 </body>

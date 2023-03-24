@@ -1,23 +1,23 @@
 <html>
 <head>
-<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-<link rel="stylesheet" type="text/css" href="style.css" />
-<title>Chapter 15: Garbage collection</title>
+    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <title>Chapter 15: Garbage collection</title>
 </head>
 <body>
 
 <h1>Garbage collection</h1>
 
 <p>
-We will implement a very simple mark-and-sweep garbage collector.
-This is not something you would want to use in a real application,
-but it will serve for our purposes.
+    We will implement a very simple mark-and-sweep garbage collector.
+    This is not something you would want to use in a real application,
+    but it will serve for our purposes.
 </p>
 
 <p>
-Remember that all our LISP data is allocated through the
-<code>cons</code> function. First we modify it to keep track of
-every allocation in a linked list.
+    Remember that all our LISP data is allocated through the
+    <code>cons</code> function. First we modify it to keep track of
+    every allocation in a linked list.
 </p>
 
 <pre class="c">
@@ -50,7 +50,7 @@ Atom cons(Atom car_val, Atom cdr_val)
 </pre>
 
 <p>
-Now a function to mark a whole tree of pairs as "in use".
+    Now a function to mark a whole tree of pairs as "in use".
 </p>
 
 <pre class="c">
@@ -78,9 +78,9 @@ void gc_mark(Atom root)
 </pre>
 
 <p>
-The garbage collector frees everything which is not marked, and
-then clears the marks ready for the next run. We also mark the
-symbol table since these are referenced by a static variable.
+    The garbage collector frees everything which is not marked, and
+    then clears the marks ready for the next run. We also mark the
+    symbol table since these are referenced by a static variable.
 </p>
 
 <pre class="c">
@@ -112,10 +112,10 @@ void gc()
 </pre>
 
 <p>
-So that we don't run out of memory under deep recursion, we
-need to call the garbage collector every few iterations of
-<code>eval_expr</code>. The interval will roughly determine
-how many allocations are made between garbage collections.
+    So that we don't run out of memory under deep recursion, we
+    need to call the garbage collector every few iterations of
+    <code>eval_expr</code>. The interval will roughly determine
+    how many allocations are made between garbage collections.
 </p>
 
 <pre class="c">
@@ -143,7 +143,7 @@ int eval_expr(Atom expr, Atom env, Atom *result)
 <h4>Testing</h4>
 
 <p>
-Adapting the <code>COUNT</code> example from previous chapters:
+    Adapting the <code>COUNT</code> example from previous chapters:
 </p>
 
 <pre class="lisp">
@@ -154,7 +154,7 @@ T
 </pre>
 
 <p>
-And lo! the operation completes without eating up all of our RAM.
+    And lo! the operation completes without eating up all of our RAM.
 </p>
 
 </body>

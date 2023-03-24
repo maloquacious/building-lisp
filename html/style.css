@@ -1,17 +1,14 @@
-pre
-{
-	border-style: solid;
-	padding: 1em;
-	display: table;
+pre {
+    border-style: solid;
+    padding: 1em;
+    display: table;
 }
 
-pre.c
-{
-	background-color: AliceBlue
+pre.c {
+    background-color: AliceBlue
 }
 
-pre.lisp
-{
-	background-color: Beige
+pre.lisp {
+    background-color: Beige
 }
 
