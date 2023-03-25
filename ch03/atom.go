@@ -34,7 +34,7 @@ const (
 type AtomValue struct {
 	integer int
 	pair    *Pair
-	symbol  []byte
+	symbol  *Symbol
 }
 
 // Bytes implements the Byter interface.
@@ -124,7 +124,7 @@ func (a Atom) Write(w io.Writer) (int, error) {
 		// and return
 		return totalBytesWritten, err
 	case AtomType_Symbol:
-		return w.Write(a.value.symbol)
+		return w.Write(a.value.symbol.label)
 	}
 
 	panic(fmt.Sprintf("assert(_type != %d)", a._type))

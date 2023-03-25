@@ -35,13 +35,18 @@ const (
 type AtomValue struct {
 	integer int
 	pair    *Pair
-	symbol  []byte
+	symbol  *Symbol
 }
 
 // Pair is the two elements of a cell.
 // "car" is the left-hand value and "cdr" is the right-hand.
 type Pair struct {
 	car, cdr Atom
+}
+
+// Symbol implements data for a symbol.
+type Symbol struct {
+	label []byte
 }
 
 // car returns the first item from a list.
@@ -102,7 +107,7 @@ func make_sym(name []byte) Atom {
 	name = bytes.ToUpper(name)
 	// search for any existing symbol with the same name
 	for atom := sym_table; !nilp(atom); atom = cdr(atom) {
-		if bytes.Equal(name, car(atom).value.symbol) {
+		if bytes.Equal(name, car(atom).value.symbol.label) {
 			// found match, so return the existing symbol
 			return atom
 		}
@@ -111,7 +116,9 @@ func make_sym(name []byte) Atom {
 	atom := Atom{
 		_type: AtomType_Symbol,
 		value: AtomValue{
-			symbol: name,
+			symbol: &Symbol{
+				label: name,
+			},
 		},
 	}
 	// add it to the symbol_table
@@ -195,7 +202,7 @@ func (a Atom) Write(w io.Writer) (int, error) {
 		// and return
 		return totalBytesWritten, err
 	case AtomType_Symbol:
-		return w.Write(a.value.symbol)
+		return w.Write(a.value.symbol.label)
 	}
 
 	panic(fmt.Sprintf("assert(_type != %d)", a._type))

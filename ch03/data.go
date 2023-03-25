@@ -39,7 +39,7 @@ func make_sym(name []byte) Atom {
 	name = bytes.ToUpper(name)
 	// search for any existing symbol with the same name
 	for atom := sym_table; !nilp(atom); atom = cdr(atom) {
-		if bytes.Equal(name, car(atom).value.symbol) {
+		if bytes.Equal(name, car(atom).value.symbol.label) {
 			// found match, so return the existing symbol
 			return atom
 		}
@@ -48,7 +48,9 @@ func make_sym(name []byte) Atom {
 	atom := Atom{
 		_type: AtomType_Symbol,
 		value: AtomValue{
-			symbol: name,
+			symbol: &Symbol{
+				label: name,
+			},
 		},
 	}
 	// add it to the symbol_table
