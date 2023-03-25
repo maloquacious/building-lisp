@@ -260,70 +260,72 @@ func make_sym(sym []byte) Atom {
 </p>
 
 <pre class="go">
-// print_expr writes the value of an Atom to the writer.
-func print_expr(w io.Writer, atom Atom) (int, error) {
-    switch atom._type {
+// print_expr is a helper function to write an expression
+// to stdout, ignoring errors.
+func print_expr(expr Atom) {
+    _, _ = expr.Write(os.Stdout)
+}
+    
+// Write writes the value of an Atom to the writer.
+// If the atom is a pair, Write is called recursively
+// to write out the entire list.
+func (a Atom) Write(w io.Writer) (int, error) {
+    switch a._type {
     case AtomType_Nil:
-        // write "NIL"
+        // atom is nil, so write "NIL"
         return w.Write([]byte{'N', 'I', 'L'})
     case AtomType_Integer:
-        return w.Write([]byte(fmt.Sprintf("%d", atom.value.integer)))
+        // atom is an integer
+        return w.Write([]byte(fmt.Sprintf("%d", a.value.integer)))
     case AtomType_Pair:
-        // write the open paren
+        // atom is a list, so write it out surrounded by ( and ).
         totalBytesWritten, err := w.Write([]byte{'('})
         if err != nil {
             return totalBytesWritten, err
         }
 
-        // print the car of the atom
-        bytesWritten, err := print_expr(w, car(atom))
+        // print the car of the list.
+        bytesWritten, err := car(a).Write(w)
         totalBytesWritten += bytesWritten
         if err != nil {
             return totalBytesWritten, err
         }
 
-        // write the remainder of the list, starting with the cdr of the atom
-        atom = cdr(atom)
-        for !nilp(atom) {
-            if atom._type == AtomType_Pair {
-                // write " " to separate the atoms in the list
-                bytesWritten, err = w.Write([]byte{' '})
-                totalBytesWritten += bytesWritten
-                if err != nil {
-                    return totalBytesWritten, err
-                }
-
-                // print the car of the current atom
-                bytesWritten, err = print_expr(w, car(atom))
-                totalBytesWritten += bytesWritten
-                if err != nil {
-                    return totalBytesWritten, err
-                }
-
-                // advance to the next atom in the list
-                atom = cdr(atom)
-
-                continue
-            }
-
-            // dotted pair to end the list
-
-            // write " . " to separate the dotted pair
-            bytesWritten, err = w.Write([]byte{' ', '.', ' '})
+        // write the remainder of the list
+        for p := cdr(a); !nilp(p); p = cdr(p) {
+            // write a space to separate expressions in the list.
+            bytesWritten, err = w.Write([]byte{' '})
             totalBytesWritten += bytesWritten
             if err != nil {
                 return totalBytesWritten, err
             }
 
-            // print the atom
-            bytesWritten, err = print_expr(w, atom)
-            totalBytesWritten += bytesWritten
-            if err != nil {
-                return totalBytesWritten, err
-            }
+            if p._type == AtomType_Pair {
+                // print the car of the list
+                bytesWritten, err = car(p).Write(w)
+                totalBytesWritten += bytesWritten
+                if err != nil {
+                    return totalBytesWritten, err
+                }
+            } else {
+                // found an "improper list" (ends with a dotted pair).
+                // write dot then space to separate the dotted pair.
+                bytesWritten, err = w.Write([]byte{'.', ' '})
+                totalBytesWritten += bytesWritten
+                if err != nil {
+                    return totalBytesWritten, err
+                }
 
-            // dotted pair ends a list, so quit the loop now
-            break
+                // print the atom
+                bytesWritten, err = p.Write(w)
+                totalBytesWritten += bytesWritten
+                if err != nil {
+                    return totalBytesWritten, err
+                }
+
+                // dotted pair ends a list, so quit the loop now
+                break
+            }
         }
 
         // write the closing paren
@@ -332,13 +334,13 @@ func print_expr(w io.Writer, atom Atom) (int, error) {
 
         // and return
         return totalBytesWritten, err
-
     case AtomType_Symbol:
-        return w.Write(atom.value.symbol)
+        return w.Write(a.value.symbol)
     }
 
-    panic(fmt.Sprintf("assert(_type != %d)", atom._type))
+    panic(fmt.Sprintf("assert(_type != %d)", a._type))
 }
+
 </pre>
 
 <p>
@@ -347,6 +349,22 @@ func print_expr(w io.Writer, atom Atom) (int, error) {
     run out of stack space, and a self-referencing tree will never finish
     printing).
 </p>
+
+<p>
+    Because this is Go, we'll also implement the Stringer interface for atoms.
+    It's easy since we can let the <code>Write</code> method do the work for us.
+</p>
+
+<pre class="go">
+// String implements the Stringer interface.
+func (a Atom) String() string {
+    sb := &strings.Builder{}
+    if _, err := a.Write(sb); err != nil {
+        panic(err)
+    }
+    return sb.String()
+}
+</pre>
 
 <h4>Testing</h4>
 

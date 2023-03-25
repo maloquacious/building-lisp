@@ -2,6 +2,13 @@
 
 package ch02
 
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"strings"
+)
+
 // Atom is either an Atom or a Pair
 type Atom struct {
 	_type AtomType
@@ -28,4 +35,97 @@ type AtomValue struct {
 	integer int
 	pair    *Pair
 	symbol  []byte
+}
+
+// Bytes implements the Byter interface.
+func (a Atom) Bytes() []byte {
+	bb := &bytes.Buffer{}
+	if _, err := a.Write(bb); err != nil {
+		panic(err)
+	}
+	return bb.Bytes()
+}
+
+// String implements the Stringer interface.
+func (a Atom) String() string {
+	sb := &strings.Builder{}
+	if _, err := a.Write(sb); err != nil {
+		panic(err)
+	}
+	return sb.String()
+}
+
+// Write writes the value of an Atom to the writer.
+// If the atom is a pair, Write is called recursively
+// to write out the entire list.
+func (a Atom) Write(w io.Writer) (int, error) {
+	switch a._type {
+	case AtomType_Nil:
+		// atom is nil, so write "NIL"
+		return w.Write([]byte{'N', 'I', 'L'})
+	case AtomType_Integer:
+		// atom is an integer
+		return w.Write([]byte(fmt.Sprintf("%d", a.value.integer)))
+	case AtomType_Pair:
+		// atom is a list, so write it out surrounded by ( and ).
+		totalBytesWritten, err := w.Write([]byte{'('})
+		if err != nil {
+			return totalBytesWritten, err
+		}
+
+		// print the car of the list.
+		bytesWritten, err := car(a).Write(w)
+		totalBytesWritten += bytesWritten
+		if err != nil {
+			return totalBytesWritten, err
+		}
+
+		// write the remainder of the list
+		for p := cdr(a); !nilp(p); p = cdr(p) {
+			// write a space to separate expressions in the list.
+			bytesWritten, err = w.Write([]byte{' '})
+			totalBytesWritten += bytesWritten
+			if err != nil {
+				return totalBytesWritten, err
+			}
+
+			if p._type == AtomType_Pair {
+				// print the car of the list
+				bytesWritten, err = car(p).Write(w)
+				totalBytesWritten += bytesWritten
+				if err != nil {
+					return totalBytesWritten, err
+				}
+			} else {
+				// found an "improper list" (ends with a dotted pair).
+				// write dot then space to separate the dotted pair.
+				bytesWritten, err = w.Write([]byte{'.', ' '})
+				totalBytesWritten += bytesWritten
+				if err != nil {
+					return totalBytesWritten, err
+				}
+
+				// print the atom
+				bytesWritten, err = p.Write(w)
+				totalBytesWritten += bytesWritten
+				if err != nil {
+					return totalBytesWritten, err
+				}
+
+				// dotted pair ends a list, so quit the loop now
+				break
+			}
+		}
+
+		// write the closing paren
+		bytesWritten, err = w.Write([]byte{')'})
+		totalBytesWritten += bytesWritten
+
+		// and return
+		return totalBytesWritten, err
+	case AtomType_Symbol:
+		return w.Write(a.value.symbol)
+	}
+
+	panic(fmt.Sprintf("assert(_type != %d)", a._type))
 }

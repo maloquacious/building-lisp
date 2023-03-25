@@ -22,14 +22,22 @@ func TestPrintExpr(t *testing.T) {
 		{3, cons(mksym("X"), mksym("Y")), "(X . Y)"},
 		{4, cons(make_int(1), cons(make_int(2), cons(make_int(3), _nil))), "(1 2 3)"},
 	} {
-		bb := &bytes.Buffer{}
-		if _, err := print_expr(bb, tc.input); err != nil {
-			t.Errorf("%d: error: want nil: got %v\n", tc.id, err)
-		} else {
-			got := string(bb.Bytes())
-			if tc.expect != got {
-				t.Errorf("%d: expr: want %s: got %s\n", tc.id, tc.expect, got)
-			}
+		// test Writer interface
+		w := &bytes.Buffer{}
+		if _, err := tc.input.Write(w); err != nil {
+			t.Errorf("%d: write: error: want nil: got %v\n", tc.id, err)
+		} else if got := string(w.Bytes()); tc.expect != got {
+			t.Errorf("%d: write: want %s: got %s\n", tc.id, tc.expect, got)
+		}
+
+		// test Byter interface
+		if got := string(tc.input.Bytes()); tc.expect != got {
+			t.Errorf("%d: byter: want %s: got %s\n", tc.id, tc.expect, got)
+		}
+
+		// test Stringer interface
+		if got := tc.input.String(); tc.expect != got {
+			t.Errorf("%d: stringer: want %s: got %s\n", tc.id, tc.expect, got)
 		}
 	}
 }
