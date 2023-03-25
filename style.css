@@ -2,9 +2,14 @@ pre {
     border-style: solid;
     padding: 1em;
     display: table;
+    width: 85ch;
 }
 
 pre.c {
+    background-color: LightCyan
+}
+
+pre.go {
     background-color: AliceBlue
 }
 
@@ -12,3 +17,13 @@ pre.lisp {
     background-color: Beige
 }
 
+table.testing {
+    border: 1px solid black;
+    border-collapse: collapse;
+    font-family: monospace;
+}
+
+table.testing th, table.testing td {
+    border: 1px solid black;
+    padding: 8px;
+}

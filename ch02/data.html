@@ -1,6 +1,7 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta content="text/html;charset=UTF-8" http-equiv="Content-type">
+    <meta charset="UTF-8">
     <link href="../style.css" rel="stylesheet" type="text/css"/>
     <title>Chapter 2: Data</title>
 </head>
@@ -10,6 +11,8 @@
 
 <p>
     We will define four kinds of object to begin with:
+</p>
+
 <dl>
     <dt>Integer</dt>
     <dd>A number. For example: 3, -9, 0.</dd>
@@ -30,9 +33,11 @@
         The types of each element may be different.
     </dd>
 </dl>
-Integers, symbols and <code>NIL</code> are called <i>simple data</i>.
-The term <i>atom</i> can refer to either a simple datum or a pair
-(purists may disagree on this point).
+
+<p>
+    Integers, symbols and <code>NIL</code> are called <i>simple data</i>.
+    The term <i>atom</i> can refer to either a simple datum or a pair
+    (purists may disagree on this point).
 </p>
 
 <p>
@@ -45,198 +50,344 @@ The term <i>atom</i> can refer to either a simple datum or a pair
 <h4>Implementation</h4>
 
 <p>
-    Let's declare some C types to hold our data. There are many clever ways
+    Let's declare some Go types to hold our data. There are many clever ways
     to store LISP objects efficiently, but for this implementation we will
     stick to a very simple scheme <small>[please excuse the pun]</small>.
 </p>
 
-<pre class="c">
-struct Atom {
-	enum {
-		AtomType_Nil,
-		AtomType_Pair,
-		AtomType_Symbol,
-		AtomType_Integer
-	} type;
-
-	union {
-		struct Pair *pair;
-		const char *symbol;
-		long integer;
-	} value;
-};
-
-struct Pair {
-	struct Atom atom[2];
-};
-
-typedef struct Atom Atom;
+<pre class="go">
+// Atom is either an Atom or a Pair
+type Atom struct {
+    _type AtomType
+    value AtomValue
+}
 </pre>
 
 <p>
-    A few macros will be handy:
-<pre class="c">
-#define car(p) ((p).value.pair-&gt;atom[0])
-#define cdr(p) ((p).value.pair-&gt;atom[1])
-#define nilp(atom) ((atom).type == AtomType_Nil)
+    We use <code>_type</code> since <code>type</code> is a reserved word in Go.
+</p>
 
-static const Atom nil = { AtomType_Nil };
+<pre class="go">
+// AtomType is the enum for the type of value in a cell.
+type AtomType int
+const (
+    // Nil represents the empty list.
+    AtomType_Nil AtomType = iota
+    // Integer is a number.
+    AtomType_Integer
+    // Pair is a "cons" cell holding a "car" and "cdr" pointer.
+    AtomType_Pair
+    // Symbol is a string of characters, converted to upper-case.
+    AtomType_Symbol
+)
+
+// AtomValue is the value of an Atom.
+// It can be a simple type, like an integer or symbol, or a pointer to a Pair.
+type value struct {
+    integer int
+    pair    *Pair
+    symbol  []byte
+}
+
+// Pair is the two elements of a cell.
+// "car" is the left-hand value and "cdr" is the right-hand.
+type Pair struct {
+    car, cdr Atom
+}
 </pre>
-The "p" in <code>nilp</code> stands for "predicate". Identifiers in C
-may not contain question marks. There is no need to restrict our LISP
-implementation in that way, of course.
+
+<p>
+    A few helper functions will be handy:
+</p>
+
+<pre class="go">
+// car returns the first item from a list.
+// It will panic if p is not a Pair
+func car(p Atom) Atom {
+    return p.value.pair.car
+}
+
+// cdr returns the remainder of a list.
+// It will panic if p is not a Pair
+func cdr(p Atom) Atom {
+    return p.value.pair.cdr
+}
+
+// nilp is a predicate function. It returns true if the atom is NIL.
+func nilp(atom Atom) bool {
+    return atom._type == AtomType_Nil
+}
+</pre>
+
+<p>
+    The "p" in <code>nilp</code> stands for "predicate". Identifiers in Go
+    may not contain question marks. There is no need to restrict our LISP
+    implementation in that way, of course.
+</p>
+
+<p>
+    Let's create a global for the NIL variable, too.
+</p>
+
+<pre class="go">
+// _nil is the NIL symbol.
+// This should be immutable, so don't change it!
+var _nil = Atom{_type: AtomType_Nil}
+</pre>
+
+<p>
+    We use <code>_nil</code> since <code>nil</code> is a reserved word in Go.
+    Go doesn't allow immutable structures, so we can't declare this as a "const."
+    Know that bad things will happen if you update this variable.
 </p>
 
 <p>
     Integers and (pointers to) strings can be copied around, but we need to
     allocate pairs on the heap.
-<pre class="c">
-Atom cons(Atom car_val, Atom cdr_val)
-{
-	Atom p;
+</p>
 
-	p.type = AtomType_Pair;
-	p.value.pair = malloc(sizeof(struct Pair));
-
-	car(p) = car_val;
-	cdr(p) = cdr_val;
-
-	return p;
+<pre class="go">
+// cons returns a new Pair created on the heap.
+func cons(car, cdr Atom) Atom {
+    return Atom{
+        _type: AtomType_Pair,
+        value: AtomValue{
+            pair: &Pair{
+                car: car,
+                cdr: cdr,
+            },
+        },
+    }
 }
 </pre>
-<code>cons</code> is a function to allocate a pair on the heap and
-assign its two elements.
+
+<p>
+    <code>cons</code> is a function to allocate a pair on the heap and
+    assign its two elements.
 </p>
 
 <p>
-    At this point you will have noticed that using <code>cons</code> will
-    leak memory the moment its return value is discarded. We will deal with
-    that later. Of course, if you are using a garbage-collected language
-    then the problem is already taken care of.
+    It may look like this <code>cons</code> will leak memory the moment its return value is discarded.
+    Go is a garbage-collected language so the memory will eventually be reclaimed.
 </p>
 
 <h4>Testing</h4>
 
 <p>
     Now we can start creating LISP objects. An integer:
-<pre class="c">
-Atom make_int(long x)
-{
-	Atom a;
-	a.type = AtomType_Integer;
-	a.value.integer = x;
-	return a;
-}
-</pre>
-And a symbol:
-<pre class="c">
-Atom make_sym(const char *s)
-{
-	Atom a;
-	a.type = AtomType_Symbol;
-	a.value.symbol = strdup(s);
-	return a;
-}
-</pre>
 </p>
+
+<pre class="go">
+// make_int returns an Atom on the stack.
+func make_int(x int) Atom {
+    return Atom{
+        _type: AtomType_Integer,
+        value: AtomValue{
+            integer: x,
+        },
+    }
+}
+</pre>
+
+<p>
+    And a symbol:
+</p>
+
+<pre class="go">
+// make_sym returns an Atom on the stack.
+// The name of the symbol is converted to uppercase.
+// Memory for the symbol is allocated and owned by the Atom.
+func make_sym(sym []byte) Atom {
+    return Atom{
+        _type: AtomType_Symbol,
+        value: AtomValue{
+            // upper-case copy of the symbol
+            symbol: bytes.ToUpper(sym),
+        },
+    }
+}
+</pre>
 
 <h2>Textual representation</h2>
 
 <p>
     We will write a pair like this:
-<pre class="lisp">(a . b)</pre>
-where <code>a</code> is the <i>car</i> and <code>b</code> is the
-<i>cdr</i>.
+</p>
+
+<pre class="lisp">
+(a . b)
+</pre>
+
+<p>
+    where <code>a</code> is the <i>car</i> and <code>b</code> is the
+    <i>cdr</i>.
 </p>
 
 <p>
     By using the <i>cdr</i> of a pair to reference another pair, we can
     create a chain:
+</p>
+
 <pre class="lisp">
 (a . (b . (c . (d . NIL))))
 </pre>
-Notice that the <i>cdr</i> of the last pair is <code>NIL</code>. This
-signifies the end of the chain, and we call this structure a
-<em>list</em>. To avoid having to write a large number of brackets, we
-will write the previous list like this:
-<pre class="lisp">(a b c d)</pre>
-Finally, if the <i>cdr</i> of the last pair in a list is not
-<code>NIL</code>, we will write this:
-<pre class="lisp">(p q . r)</pre>
-which is equivalent to
-<pre class="lisp">(p . (q . r))</pre>
-This is called an <i>improper list</i>.
+
+<p>
+    Notice that the <i>cdr</i> of the last pair is <code>NIL</code>. This
+    signifies the end of the chain, and we call this structure a
+    <em>list</em>. To avoid having to write a large number of brackets, we
+    will write the previous list like this:
 </p>
+<pre class="lisp">(a b c d)</pre>
+<p>
+    Finally, if the <i>cdr</i> of the last pair in a list is not
+    <code>NIL</code>, we will write this:
+</p>
+
+<pre class="lisp">(p q . r)</pre>
+
+<p>which is equivalent to</p>
+
+<pre class="lisp">(p . (q . r))</pre>
+
+<p>This is called an <i>improper list</i>.</p>
 
 <h4>Implementation</h4>
 
 <p>
     Printing an atom or list is simple.
-<pre class="c">
-void print_expr(Atom atom)
-{
-	switch (atom.type) {
-	case AtomType_Nil:
-		printf("NIL");
-		break;
-	case AtomType_Pair:
-		putchar('(');
-		print_expr(car(atom));
-		atom = cdr(atom);
-		while (!nilp(atom)) {
-			if (atom.type == AtomType_Pair) {
-				putchar(' ');
-				print_expr(car(atom));
-				atom = cdr(atom);
-			} else {
-				printf(" . ");
-				print_expr(atom);
-				break;
-			}
-		}
-		putchar(')');
-		break;
-	case AtomType_Symbol:
-		printf("%s", atom.value.symbol);
-		break;
-	case AtomType_Integer:
-		printf("%ld", atom.value.integer);
-		break;
-	}
+    (In theory - the boilerplate from handling errors makes it look complicated.)
+</p>
+
+<pre class="go">
+// print_expr writes the value of an Atom to the writer.
+func print_expr(w io.Writer, atom Atom) (int, error) {
+    switch atom._type {
+    case AtomType_Nil:
+        // write "NIL"
+        return w.Write([]byte{'N', 'I', 'L'})
+    case AtomType_Integer:
+        return w.Write([]byte(fmt.Sprintf("%d", atom.value.integer)))
+    case AtomType_Pair:
+        // write the open paren
+        totalBytesWritten, err := w.Write([]byte{'('})
+        if err != nil {
+            return totalBytesWritten, err
+        }
+
+        // print the car of the atom
+        bytesWritten, err := print_expr(w, car(atom))
+        totalBytesWritten += bytesWritten
+        if err != nil {
+            return totalBytesWritten, err
+        }
+
+        // write the remainder of the list, starting with the cdr of the atom
+        atom = cdr(atom)
+        for !nilp(atom) {
+            if atom._type == AtomType_Pair {
+                // write " " to separate the atoms in the list
+                bytesWritten, err = w.Write([]byte{' '})
+                totalBytesWritten += bytesWritten
+                if err != nil {
+                    return totalBytesWritten, err
+                }
+
+                // print the car of the current atom
+                bytesWritten, err = print_expr(w, car(atom))
+                totalBytesWritten += bytesWritten
+                if err != nil {
+                    return totalBytesWritten, err
+                }
+
+                // advance to the next atom in the list
+                atom = cdr(atom)
+
+                continue
+            }
+
+            // dotted pair to end the list
+
+            // write " . " to separate the dotted pair
+            bytesWritten, err = w.Write([]byte{' ', '.', ' '})
+            totalBytesWritten += bytesWritten
+            if err != nil {
+                return totalBytesWritten, err
+            }
+
+            // print the atom
+            bytesWritten, err = print_expr(w, atom)
+            totalBytesWritten += bytesWritten
+            if err != nil {
+                return totalBytesWritten, err
+            }
+
+            // dotted pair ends a list, so quit the loop now
+            break
+        }
+
+        // write the closing paren
+        bytesWritten, err = w.Write([]byte{')'})
+        totalBytesWritten += bytesWritten
+
+        // and return
+        return totalBytesWritten, err
+
+    case AtomType_Symbol:
+        return w.Write(atom.value.symbol)
+    }
+
+    panic(fmt.Sprintf("assert(_type != %d)", atom._type))
 }
 </pre>
-By using recursion we can print aribtrarily complex data structures.
-(Actually that's not true: for a very deeply nested structure we will
-run out of stack space, and a self-referencing tree will never finish
-printing).
+
+<p>
+    By using recursion we can print arbitrarily complex data structures.
+    (Actually that's not true: for a very deeply nested structure we will
+    run out of stack space, and a self-referencing tree will never finish
+    printing).
 </p>
 
 <h4>Testing</h4>
 
 <p>
     See what <code>print_expr</code> does with various atoms:
-<table border="1">
+</p>
+
+<table class="testing">
+    <thead>
     <tr>
+        <th>ID</th>
         <th>Atom</th>
         <th>Output</th>
     </tr>
+    </thead>
+    <tbody>
     <tr>
+        <td>1</td>
         <td><code>make_int(42)</code>
         <td><code>42</code></td>
+    </tr>
     <tr>
+        <td>2</td>
         <td><code>make_sym("FOO")</code>
         <td><code>FOO</code></td>
+    </tr>
     <tr>
+        <td>3</td>
         <td><code>cons(make_sym("X"), make_sym("Y"))</code>
         <td><code>(X . Y)</code></td>
+    </tr>
     <tr>
+        <td>4</td>
         <td><code>cons(make_int(1),<br/>
-            &nbsp;&nbsp;cons(make_int(2),<br/>
-            &nbsp;&nbsp;cons(make_int(3),<br/>
-            &nbsp;&nbsp;nil)))</code>
+                &nbsp;&nbsp;cons(make_int(2),<br/>
+                &nbsp;&nbsp;cons(make_int(3),<br/>
+                &nbsp;&nbsp;nil)))</code>
         <td><code>(1 2 3)</code></td>
+    </tr>
+    </tbody>
 </table>
-</p>
 
 <p>
     All this is pretty trivial. We'll get on to some more interesting stuff
@@ -256,29 +407,44 @@ printing).
     Languages with a set or hashtable container make this easy, but we can
     use the LISP data structures already implemented to store the symbols
     in a list:
-<pre class="c">
-static Atom sym_table = { AtomType_Nil };
+</p>
 
-Atom make_sym(const char *s)
-{
-	Atom a, p;
+<pre class="go">
+// sym_table is a global symbol table.
+// it is a list of all existing symbols.
+var sym_table = Atom{_type: AtomType_Nil}
 
-	p = sym_table;
-	while (!nilp(p)) {
-		a = car(p);
-		if (strcmp(a.value.symbol, s) == 0)
-			return a;
-		p = cdr(p);
-	}
-
-	a.type = AtomType_Symbol;
-	a.value.symbol = strdup(s);
-	sym_table = cons(a, sym_table);
-
-	return a;
+// make_sym returns an Atom on the stack.
+// The name of the symbol is always converted to uppercase.
+// If the symbol already exists in the global symbol table, that symbol is
+// returned. Otherwise, a new symbol is created on the stack, added to the
+// symbol table, and returned. The new symbol allocates space for the name.
+func make_sym(name []byte) Atom {
+    // make an upper-case copy of the name
+    name = bytes.ToUpper(name)
+    // search for any existing symbol with the same name
+    for atom := sym_table; !nilp(atom); atom = cdr(atom) {
+        if bytes.Equal(name, car(atom).value.symbol) {
+            // found match, so return the existing symbol
+            return atom
+        }
+    }
+    // did not find a matching symbol, so create a new one
+    atom := Atom{
+        _type: AtomType_Symbol,
+        value: AtomValue{
+            symbol: name,
+        },
+    }
+    // add it to the symbol_table
+    sym_table = cons(atom, sym_table)
+    // and return it
+    return atom
 }
 </pre>
-Neat, huh? It's not particularly efficient, but it will do fine for now.
+
+<p>
+    Neat, huh? It's not particularly efficient, but it will do fine for now.
 </p>
 
 <hr/>
