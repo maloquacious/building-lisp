@@ -1,3 +1,8 @@
+p {
+    margin-left: 2ch;
+    width: 85ch;
+}
+
 pre {
     border-style: solid;
     padding: 1em;
@@ -17,13 +22,17 @@ pre.lisp {
     background-color: Beige
 }
 
-table.testing {
+table {
     border: 1px solid black;
     border-collapse: collapse;
     font-family: monospace;
 }
 
-table.testing th, table.testing td {
+table.lisp {
+    background-color: Beige
+}
+
+th, td {
     border: 1px solid black;
     padding: 8px;
 }

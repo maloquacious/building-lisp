@@ -21,17 +21,23 @@
 
 <p>
     Here is a definition of an <code>Error</code> type:
-<pre class="c">
-typedef enum {
-	Error_OK = 0,
-	Error_Syntax
-} Error;
+</p>
+
+<pre class="go">
+var (
+    // Error_EndOfInput is returned at end of input.
+    Error_EndOfInput = fmt.Errorf("eof")
+    // Error_Syntax is returned for almost every error parsing.
+    Error_Syntax = fmt.Errorf("syntax")
+)
 </pre>
-If, like me, you learned to program in BASIC on microcomputers, you
-will be familiar with the dreaded <code>SYNTAX ERROR</code>. Now is our
-chance to see things from the other side of the fence. Most of our
-functions from now on will return an <code>Error</code> to indicate
-whether and how something went wrong.
+
+<p>
+    If, like me, you learned to program in BASIC on microcomputers, you
+    will be familiar with the dreaded <code>SYNTAX ERROR</code>. Now is our
+    chance to see things from the other side of the fence. Most of our
+    functions from now on will return an <code>Error</code> to indicate
+    whether and how something went wrong.
 </p>
 
 <h2>Lexer</h2>
@@ -41,11 +47,15 @@ whether and how something went wrong.
     to split a string up into <i>tokens</i>, which are both "words" and
     "punctuation", and discard any insignificant white space. So if the
     input is:
+</p>
+
 <pre class="lisp">
 (foo bar)
 </pre>
-Then the four tokens are:
-<table border="1">
+
+<p>Then the four tokens are:</p>
+
+<table class="lisp">
     <tr>
         <td><code>(</code></td>
         <td><code>foo</code></td>
@@ -53,97 +63,160 @@ Then the four tokens are:
         <td><code>)</code></td>
     </tr>
 </table>
-</p>
 
 <p>
-    So let's start by creating a <i>lexer</i>, which will return the start
-    and end of the next token in a string.
+    So let's start by creating a <i>lexer</i>, which will return the next token and the remainder of the input each time
+    it is called. If it can't find a token (meaning that the input is empty or entirely whitespace), it will return
+    <code>nil</code> for both token and remainder.
 </p>
 
-<pre class="c">
-int lex(const char *str, const char **start, const char **end)
-{
-	const char *ws = " \t\n";
-	const char *delim = "() \t\n";
-	const char *prefix = "()";
+<pre class="go">
+var (
+    // whitespace separates tokens and is generally ignored
+    whitespace = []byte{' ', '\t', '\r', '\n'}
+    // reserved characters are part of the syntax of our lisp
+    reserved = []byte{'(', ')'}
+    // delimiters are characters that are not allowed in a symbol.
+    // at the minimum, this must include all whitespace and
+    // reserved characters.
+    delimiters = []byte{' ', '\t', '\r', '\n', '(', ')'}
+)
 
-	str += strspn(str, ws);
+// lex extracts the next token from the input after skipping
+// comments and leading whitespace. on end of input, it
+// returns nil for both the token and the remainder.
+func lex(input []byte) (token []byte, remainder []byte) {
+    // skip whitespace
+    input = skipws(input)
 
-	if (str[0] == '\0') {
-		*start = *end = NULL;
-		return Error_Syntax;
-	}
+    // check for end of input
+    if len(input) == 0 {
+        return nil, nil
+    }
 
-	*start = str;
+    // check for reserved tokens
+    if bytes.IndexByte(reserved, input[0]) >= 0 { // input is reserved
+        token, remainder = input[:1], input[1:]
+        return token, remainder
+    }
 
-	if (strchr(prefix, str[0]) != NULL)
-		*end = str + 1;
-	else
-		*end = str + strcspn(str, delim);
+    // if we get here, the token is a symbol.
+    // collect and return all the characters up to the first delimiter.
+    token, remainder = runto(input, delimiters)
+    return token, remainder
+}
 
-	return Error_OK;
+// runof splits the input in two. the first part is the prefix from input that
+// includes delimiters. the second is the remainder of the input.
+func runof(input, delim []byte) ([]byte, []byte) {
+    for n, ch := range input {
+        if bytes.IndexByte(delim, ch) == -1 {
+            // ch is NOT a delimiter, so split here
+            return input[:n], input[n:]
+        }
+    }
+    // the entire input consists delimiters
+    return input, nil
+}
+
+// runto splits the input in two. the first part is the prefix from input that
+// does not include any delimiter. the second is the remainder of the input,
+func runto(input, delim []byte) ([]byte, []byte) {
+    for n, ch := range input {
+        if bytes.IndexByte(delim, ch) != -1 {
+            // ch IS a delimiter, so split here
+            return input[:n], input[n:]
+        }
+    }
+    // there are no delimiters in the input
+    return input, nil
+}
+
+// skipws skips whitespace characters.
+func skipws(input []byte) []byte {
+    _, input = runof(input, whitespace)
+    return input
 }
 </pre>
 
 <p>
-    If our lexer hits the end of the string without finding a token (ie,
-    the remainder of the string is entirely white space), then it will
-    return a syntax error and set the start and end to <code>NULL</code>.
+    We should write test cases for the lexer:
 </p>
+
+<table class="testing">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Input</th>
+        <th>Tokens</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>1</td>
+        <td>""</td>
+        <td>""</td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>"42"</td>
+        <td>"42", ""</td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>"(foo bar)"</td>
+        <td>"(", "foo", "bar", ")", ""</td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td>"(s (t . u) v . (w . nil))"</td>
+        <td>"(", "s", "(", "t", ".", "u", ")", "v", ".", "(", "w", ".", "nil", ")", ")", ""</td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>"a(b)c\n"</td>
+        <td>"a", "(", "b", ")", "c", ""</td>
+    </tr>
+    </tbody>
+</table>
 
 <h2>Parser</h2>
 
 <p>
-    Now we can think about the parser itself. The entry point
-    is <code>read_expr</code>, which will read a single (possibly complex)
-    object and return the error status and a pointer to the remainder of
-    the input.
-<pre class="c">
-int read_expr(const char *input, const char **end, Atom *result);
-</pre>
+    Now we can think about the parser itself.
+    The entry point is <code>read_expr</code>, which will read a single (possibly complex) object and return the
+    expression, the remainder of the input, and any errors found.
 </p>
+<pre class="go">
+func read_expr(input []byte) (expr Atom, remainder []byte, err error)
+</pre>
 
 <p>
-    We will first deal with the simple data: integers, symbols and
-    <code>NIL</code>. If you have a regex library available then this is
-    easy, but it's not too bad in plain C either.
+    We will first deal with the simple data: integers, symbols and <code>NIL</code>.
 </p>
 
-<pre class="c">
-int parse_simple(const char *start, const char *end, Atom *result)
-{
-	char *buf, *p;
+<pre class="go">
+// read_atom reads an atom (a number or symbol) from the input.
+// if it's a symbol, we assume that the caller has parsed it already
+// and do no checking that it is a valid symbol.
+func read_atom(input []byte) Atom {
+    if val, err := strconv.Atoi(string(input)); err == nil { // it is an integer
+        return make_int(val)
+    }
 
-	/* Is it an integer? */
-	long val = strtol(start, &amp;p, 10);
-	if (p == end) {
-		result->type = AtomType_Integer;
-		result->value.integer = val;
-		return Error_OK;
-	}
-
-	/* NIL or symbol */
-	buf = malloc(end - start + 1);
-	p = buf;
-	while (start != end)
-		*p++ = toupper(*start), ++start;
-	*p = '\0';
-
-	if (strcmp(buf, "NIL") == 0)
-		*result = nil;
-	else
-		*result = make_sym(buf);
-
-	free(buf);
-
-	return Error_OK;
+    // it is a symbol, but we must treat NIL specially.
+    sym := bytes.ToUpper(input)
+    if bytes.Equal(sym, []byte{'N', 'I', 'L'}) { // it is NIL
+        return _nil
+    }
+    return make_sym(sym)
 }
 </pre>
 
 <p>
     Notice two things: first, we are converting the input to upper case.
     This isn't strictly necessary &mdash; there's nothing wrong with having
-    a case-sensitive lisp &mdash; but it is the traditional behaviour.
+    a case-sensitive LISP &mdash; but it is the traditional behaviour.
     Secondly, <code>NIL</code> is a special case: it's parsed directly as
     <code>AtomType_Nil</code>, rather than leaving it as a symbol.
 </p>
@@ -163,147 +236,181 @@ int parse_simple(const char *start, const char *end, Atom *result)
     lists.
 </p>
 
-<pre class="c">
-int read_list(const char *start, const char **end, Atom *result)
-{
-	Atom p;
+<pre class="go">
+// read_list reads the next list from the input.
+// it returns the remainder of the input or an error.
+func read_list(input []byte) (list Atom, remainder []byte, err error) {
+    var token []byte
+    var expr, tail Atom
+    for token, remainder = lex(input); token != nil; token, remainder = lex(input) {
+        // check for ")"
+        if bytes.Equal(token, []byte{')'}) {
+            // return the list, remainder, and no error
+            return list, remainder, nil
+        }
 
-	*end = start;
-	p = *result = nil;
+        // check for "."
+        if bytes.Equal(token, []byte{'.'}) {
+            // a dotted list must look like "(x . y)" or it is an improper list
+            if nilp(tail) {
+                // dot can't start a list, so this is an improper list
+                return _nil, nil, Error_Syntax
+            }
 
-	for (;;) {
-		const char *token;
-		Atom item;
-		Error err;
+            // read the next expression and set the cdr of the current atom to it
+            expr, remainder, err = read_expr(remainder)
+            if err != nil {
+                // return the error
+                return _nil, nil, err
+            }
+            setcdr(tail, expr)
 
-		err = lex(*end, &amp;token, end);
-		if (err)
-			return err;
+            // read the closing paren
+            token, remainder = lex(remainder)
+            if !bytes.Equal(token, []byte{')'}) {
+                // no closing paren, so this is an improper list
+                return _nil, nil, Error_Syntax
+            }
 
-		if (token[0] == ')')
-			return Error_OK;
+            // return the list, remainder, and no error
+            return list, remainder, nil
+        }
 
-		if (token[0] == '.' &amp;&amp; *end - token == 1) {
-			/* Improper list */
-			if (nilp(p))
-				return Error_Syntax;
+        // read the next expression
+        if expr, remainder, err = read_expr(input); err != nil {
+            // return the error
+            return _nil, nil, err
+        }
 
-			err = read_expr(*end, end, &amp;item);
-			if (err)
-				return err;
+        // and append it to the tail of the list
+        if nilp(list) {
+            // first item in the list, so create a new list
+            list = cons(expr, _nil)
+            tail = list
+        } else {
+            // append to tail, then update tail
+            setcdr(tail, cons(expr, _nil))
+            tail = cdr(tail)
+        }
 
-			cdr(p) = item;
+        // at this point:
+        //    list is the head of the list
+        //    tail is the last item in the list
 
-			/* Read the closing ')' */
-			err = lex(*end, &amp;token, end);
-			if (!err &amp;&amp; token[0] != ')')
-				err = Error_Syntax;
+        // update the input and loop back to parse the remainder of the input
+        input = remainder
+    }
 
-			return err;
-		}
+    // eof is an error since lists must end with a close paren.
+    return _nil, nil, Error_Syntax
+}
 
-		err = read_expr(token, end, &amp;item);
-		if (err)
-			return err;
-
-		if (nilp(p)) {
-			/* First item */
-			*result = cons(item, nil);
-			p = *result;
-		} else {
-			cdr(p) = cons(item, nil);
-			p = cdr(p);
-		}
-	}
+// setcdr is a helper function to set the cdr of a pair.
+// panics if p is not a pair.
+func setcdr(p, a Atom) {
+    p.value.pair.cdr = a
 }
 </pre>
 
 <p>
-    I dislike writing infinite loops, but this is the clearest layout I have
-    come up with so far. Let me know if you can write a better one!
+    This takes advantage of the fact that the "zero value" for an Atom has <code>_type</code> set to
+    <code>AtomType_Nil</code>. We also created a <code>setcdr</code> function to make the code a little easier to read.
 </p>
 
 <p>
-    Finally we have <code>read_expr</code> itself, which is very simple now
-    that we have done all of the hard work:
-<pre class="c">
-int read_expr(const char *input, const char **end, Atom *result)
-{
-	const char *token;
-	Error err;
+    Finally we have <code>read_expr</code> itself, which is very simple now that we have done all the hard work:
+</p>
 
-	err = lex(input, &amp;token, end);
-	if (err)
-		return err;
+<pre class="go">
+// read_expr reads the next expression from the input. an expression is
+// either an atom or a list of expressions. returns the expression along
+// with the remainder of the input and any errors.
+// returns NIL and Error_EndOfInput on end of input. the caller must
+// decide how to handle it.
+func read_expr(input []byte) (expr Atom, remainder []byte, err error) {
+    token, rest := lex(input)
+    if token == nil { // end of input
+        return _nil, nil, Error_EndOfInput
+    }
 
-	if (token[0] == '(')
-		return read_list(*end, end, result);
-	else if (token[0] == ')')
-		return Error_Syntax;
-	else
-		return parse_simple(token, *end, result);
+    switch token[0] {
+    case '(':
+        return read_list(rest)
+    case ')':
+        // unexpected close paren
+        return _nil, nil, Error_Syntax
+    }
+    return read_atom(token), rest, err
 }
+
 </pre>
-The check for a closing bracket will catch invalid forms such as
+
+<p>The check for a closing bracket will catch invalid forms such as</p>
+
 <pre class="lisp">)</pre>
-and
+
+<p>and</p>
+
 <pre class="lisp">(X .)</pre>
-</p>
 
 <h4>Testing</h4>
 
 <p>
-    If we use the parser to create a simple read-print loop, then the we
-    can type representations of objects on the console and check that they
-    are parsed correctly.
+    We can use the parser to create table driven tests:
 </p>
 
-<pre class="c">
-int main(int argc, char **argv)
-{
-	char *input;
-
-	while ((input = readline("&gt; ")) != NULL) {
-		const char *p = input;
-		Error err;
-		Atom expr;
-
-		err = read_expr(p, &amp;p, &amp;expr);
-
-		switch (err) {
-		case Error_OK:
-			print_expr(expr);
-			putchar('\n');
-			break;
-		case Error_Syntax:
-			puts("Syntax error");
-			break;
-		}
-
-		free(input);
-	}
-
-	return 0;
+<pre class="go">
+// test the read_expr function
+for _, tc := range []struct {
+    id     int
+    input  string
+    expect string
+}{
+    {id: 10, input: "42", expect: "42"},
+    {id: 11, input: "(foo bar)", expect: "(FOO BAR)"},
+    {id: 12, input: "(s (t . u) v . (w . nil))", expect: "(S (T . U) V W)"},
+    {id: 13, input: "()", expect: "NIL"},
+} {
+    input := []byte(tc.input)
+    expr, _, _ := read_expr(input)
+    got := expr.String()
+    if tc.expect != got {
+        t.Errorf("%d: want %q: got %q\n", tc.id, tc.expect, got)
+    }
 }
 </pre>
 
-<p>
-    This version uses the <i>readline</i> library, which shows a prompt
-    and reads a line of text from the console. It supports editing beyond
-    what a dumb terminal can provide, but a simple wrapper around
-    <code>fgets()</code> will do just as well.
-</p>
-
-<pre class="lisp">
-&gt; <b>42</b>
-42
-&gt; <b>(foo bar)</b>
-(FOO BAR)
-&gt; <b>(s (t . u) v . (w . nil))</b>
-(S (T . U) V W)
-&gt; <b>()</b>
-NIL
-</pre>
+<table class="testing">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Input</th>
+        <th>Output</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>10</td>
+        <td>"42"</td>
+        <td>"42"</td>
+    </tr>
+    <tr>
+        <td>11</td>
+        <td>"(foo bar)"</td>
+        <td>"(FOO BAR)"</td>
+    </tr>
+    <tr>
+        <td>12</td>
+        <td>"(s (t . u) v . (w . nil))"</td>
+        <td>"(S (T . U) V W)"</td>
+    </tr>
+    <tr>
+        <td>13</td>
+        <td>"()"</td>
+        <td>"NIL"</td>
+    </tr>
+    </tbody>
+</table>
 
 <p>
     Looks good! Remember that <code>()</code> is exactly the same as
@@ -313,12 +420,12 @@ NIL
 
 <hr/>
 <footer>
-	<p>
-		** <a href="../index.html">Home Page</a>
-		** <a href="../ch02/data.html">Chapter 2: Data</a>
-		** <a href="../ch04/expressions.html">Chapter 4: Expressions</a>
-		**
-	</p>
+    <p>
+        ** <a href="../index.html">Home Page</a>
+        ** <a href="../ch02/data.html">Chapter 2: Data</a>
+        ** <a href="../ch04/expressions.html">Chapter 4: Expressions</a>
+        **
+    </p>
 </footer>
 
 </body>
