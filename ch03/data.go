@@ -4,6 +4,8 @@ package ch03
 
 import "bytes"
 
+// functions in this file create cells on the stack or on the heap.
+
 // cons returns a new Pair created on the heap.
 func cons(car, cdr Atom) Atom {
 	return Atom{
@@ -26,10 +28,6 @@ func make_int(x int) Atom {
 		},
 	}
 }
-
-// sym_table is a global symbol table.
-// it is a list of all existing symbols.
-var sym_table = Atom{_type: AtomType_Nil}
 
 // make_sym returns an Atom on the stack.
 // The name of the symbol is always converted to uppercase.

@@ -2,10 +2,6 @@
 
 package ch03
 
-// _nil is the NIL symbol.
-// This should be immutable, so don't change it!
-var _nil = Atom{_type: AtomType_Nil}
-
 // car returns the first item from a list.
 // It will panic if p is not a Pair
 func car(p Atom) Atom {
