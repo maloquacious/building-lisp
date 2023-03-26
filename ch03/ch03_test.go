@@ -2,7 +2,9 @@
 
 package ch03
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestChapter03(t *testing.T) {
 	// test the runof function
@@ -98,11 +100,45 @@ func TestChapter03(t *testing.T) {
 		{id: 12, input: "(s (t . u) v . (w . nil))", expect: "(S (T . U) V W)"},
 		{id: 13, input: "()", expect: "NIL"},
 	} {
+		// reset the symbol table
+		sym_table = _nil
+
 		input := []byte(tc.input)
 		expr, _, _ := read_expr(input)
 		got := expr.String()
 		if tc.expect != got {
 			t.Errorf("%d: want %q: got %q\n", tc.id, tc.expect, got)
+		}
+	}
+
+	// test the read function
+	for _, tc := range []struct {
+		id     int
+		input  string
+		expect string
+	}{
+		{id: 10, input: "42", expect: "42"},
+		{id: 11, input: "(foo bar)", expect: "(FOO BAR)"},
+		{id: 12, input: "(s (t . u) v . (w . nil))", expect: "(S (T . U) V W)"},
+		{id: 13, input: "()", expect: "NIL"},
+		{id: 14, input: "(42)", expect: "(42)"},
+		{id: 15, input: "(foo)", expect: "(FOO)"},
+		{id: 16, input: "nil", expect: "NIL"},
+	} {
+		// reset the symbol table
+		sym_table = _nil
+
+		input := []byte(tc.input)
+		expr, remainder, err := read(input)
+		got := expr.String()
+		if tc.expect != got {
+			t.Errorf("%d: want %q: got %q\n", tc.id, tc.expect, got)
+		}
+		if len(remainder) != 0 {
+			t.Errorf("%d: want %q: got %q\n", tc.id, "", string(remainder))
+		}
+		if err != nil {
+			t.Errorf("%d: want nil: got %v\n", tc.id, err)
 		}
 	}
 }
