@@ -104,7 +104,8 @@ func TestChapter03(t *testing.T) {
 		sym_table = _nil
 
 		input := []byte(tc.input)
-		expr, _, _ := read_expr(input)
+		var expr Atom
+		_, _ = read_expr(input, &expr)
 		got := expr.String()
 		if tc.expect != got {
 			t.Errorf("%d: want %q: got %q\n", tc.id, tc.expect, got)

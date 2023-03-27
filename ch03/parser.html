@@ -199,17 +199,19 @@ func read_expr(input []byte) (expr Atom, remainder []byte, err error)
 // read_atom reads an atom (a number or symbol) from the input.
 // if it's a symbol, we assume that the caller has parsed it already
 // and do no checking that it is a valid symbol.
-func read_atom(input []byte) Atom {
+func read_atom(input []byte, result *Atom) error {
     if val, err := strconv.Atoi(string(input)); err == nil { // it is an integer
-        return make_int(val)
+        *result = make_int(val)
+        return nil
     }
-
     // it is a symbol, but we must treat NIL specially.
-    sym := bytes.ToUpper(input)
-    if bytes.Equal(sym, []byte{'N', 'I', 'L'}) { // it is NIL
-        return _nil
+    if label := bytes.ToUpper(input); bytes.Equal(label, []byte{'N', 'I', 'L'}) {
+        // it is NIL and NIL must never be added to the symbol table.
+        *result = _nil
+    } else {
+        *result = make_sym(label)
     }
-    return make_sym(sym)
+    return nil
 }
 </pre>
 
@@ -239,14 +241,18 @@ func read_atom(input []byte) Atom {
 <pre class="go">
 // read_list reads the next list from the input.
 // it returns the remainder of the input or an error.
-func read_list(input []byte) (list Atom, remainder []byte, err error) {
+func read_list(input []byte, result *Atom) (remainder []byte, err error) {
+    // set the result to NIL in case we read an empty list.
+    *result = _nil
+
     var token []byte
-    var expr, tail Atom
+    var tail Atom
     for token, remainder = lex(input); token != nil; token, remainder = lex(input) {
         // check for ")"
         if bytes.Equal(token, []byte{')'}) {
-            // return the list, remainder, and no error
-            return list, remainder, nil
+            // result holds the list.
+            // return the remainder and no error
+            return remainder, nil
         }
 
         // check for "."
@@ -254,14 +260,15 @@ func read_list(input []byte) (list Atom, remainder []byte, err error) {
             // a dotted list must look like "(x . y)" or it is an improper list
             if nilp(tail) {
                 // dot can't start a list, so this is an improper list
-                return _nil, nil, Error_Syntax
+                return nil, Error_Syntax
             }
 
             // read the next expression and set the cdr of the current atom to it
-            expr, remainder, err = read_expr(remainder)
+            var expr Atom
+            remainder, err = read_expr(remainder, &expr)
             if err != nil {
                 // return the error
-                return _nil, nil, err
+                return nil, err
             }
             setcdr(tail, expr)
 
@@ -269,24 +276,27 @@ func read_list(input []byte) (list Atom, remainder []byte, err error) {
             token, remainder = lex(remainder)
             if !bytes.Equal(token, []byte{')'}) {
                 // no closing paren, so this is an improper list
-                return _nil, nil, Error_Syntax
+                return nil, Error_Syntax
             }
 
-            // return the list, remainder, and no error
-            return list, remainder, nil
+            // result holds the list.
+            // return the remainder and no error
+            return remainder, nil
         }
 
         // read the next expression
-        if expr, remainder, err = read_expr(input); err != nil {
+        var expr Atom
+        remainder, err = read_expr(input, &expr)
+        if err != nil {
             // return the error
-            return _nil, nil, err
+            return nil, err
         }
 
         // and append it to the tail of the list
-        if nilp(list) {
+        if nilp(tail) {
             // first item in the list, so create a new list
-            list = cons(expr, _nil)
-            tail = list
+            *result = cons(expr, _nil)
+            tail = *result
         } else {
             // append to tail, then update tail
             setcdr(tail, cons(expr, _nil))
@@ -294,15 +304,15 @@ func read_list(input []byte) (list Atom, remainder []byte, err error) {
         }
 
         // at this point:
-        //    list is the head of the list
-        //    tail is the last item in the list
+        //    result is the head of the list
+        //    tail   is the last item in the list
 
         // update the input and loop back to parse the remainder of the input
         input = remainder
     }
 
     // eof is an error since lists must end with a close paren.
-    return _nil, nil, Error_Syntax
+    return nil, Error_Syntax
 }
 
 // setcdr is a helper function to set the cdr of a pair.
@@ -327,22 +337,23 @@ func setcdr(p, a Atom) {
 // with the remainder of the input and any errors.
 // returns NIL and Error_EndOfInput on end of input. the caller must
 // decide how to handle it.
-func read_expr(input []byte) (expr Atom, remainder []byte, err error) {
+// todo: result is not always updated by read. does that lead to bugs later?
+func read_expr(input []byte, result *Atom) (remainder []byte, err error) {
     token, rest := lex(input)
     if token == nil { // end of input
-        return _nil, nil, Error_EndOfInput
+        return nil, Error_EndOfInput
     }
 
     switch token[0] {
     case '(':
-        return read_list(rest)
+        return read_list(rest, result)
     case ')':
         // unexpected close paren
-        return _nil, nil, Error_Syntax
+        return nil, Error_Syntax
     }
-    return read_atom(token), rest, err
+    err = read_atom(token, result)
+    return rest, err
 }
-
 </pre>
 
 <p>The check for a closing bracket will catch invalid forms such as</p>
@@ -360,22 +371,28 @@ func read_expr(input []byte) (expr Atom, remainder []byte, err error) {
 </p>
 
 <pre class="go">
-// test the read_expr function
-for _, tc := range []struct {
-    id     int
-    input  string
-    expect string
-}{
-    {id: 10, input: "42", expect: "42"},
-    {id: 11, input: "(foo bar)", expect: "(FOO BAR)"},
-    {id: 12, input: "(s (t . u) v . (w . nil))", expect: "(S (T . U) V W)"},
-    {id: 13, input: "()", expect: "NIL"},
-} {
-    input := []byte(tc.input)
-    expr, _, _ := read_expr(input)
-    got := expr.String()
-    if tc.expect != got {
-        t.Errorf("%d: want %q: got %q\n", tc.id, tc.expect, got)
+func TestChapter03(t *testing.T) {
+    // test the read_expr function
+    for _, tc := range []struct {
+        id     int
+        input  string
+        expect string
+    }{
+        {id: 10, input: "42", expect: "42"},
+        {id: 11, input: "(foo bar)", expect: "(FOO BAR)"},
+        {id: 12, input: "(s (t . u) v . (w . nil))", expect: "(S (T . U) V W)"},
+        {id: 13, input: "()", expect: "NIL"},
+    } {
+        // reset the symbol table
+        sym_table = _nil
+
+        input := []byte(tc.input)
+        var expr Atom
+        _, _ = read_expr(input, &expr)
+        got := expr.String()
+        if tc.expect != got {
+            t.Errorf("%d: want %q: got %q\n", tc.id, tc.expect, got)
+        }
     }
 }
 </pre>
