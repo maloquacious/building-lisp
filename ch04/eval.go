@@ -2,9 +2,8 @@
 
 package lisp
 
-// eval_expr evaluates an expression with a given environment.
-// it updates result and returns any errors.
-// note that result isn't always updated when there are errors.
+// eval_expr evaluates an expression with a given environment and updates the result.
+// note that the result may not be updated if we find errors.
 func eval_expr(expr, env Atom, result *Atom) error {
 	if expr._type == AtomType_Symbol {
 		return env_get(env, expr, result)
