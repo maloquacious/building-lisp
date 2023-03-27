@@ -12,14 +12,19 @@
 <p>
     We will define some additional syntax to facilitate entry of some common
     expressions. Recall that we already allow the user to enter
+</p>
+
 <pre class="lisp">
 (A B C)
 </pre>
-instead of
+
+<p>
+    instead of
+</p>
+
 <pre class="lisp">
 (A . (B . (C . NIL)))
 </pre>
-</p>
 
 <h2>Quoting</h2>
 
@@ -27,18 +32,25 @@ instead of
     In order to include a literal symbol or list in an expression, we need
     to use the <code>QUOTE</code> operator. As a shortcut, we will
     define
+</p>
+
 <pre class="lisp">
 'EXPR
 </pre>
-to be equivalent to
+
+<p>
+    to be equivalent to
+</p>
+
 <pre class="lisp">
 (QUOTE EXPR)
 </pre>
-</p>
 
 <p>
     So for example the following forms are equivalent:
-<table border="1">
+</p>
+
+<table>
     <tr>
         <th>Abbreviation</th>
         <th>Canonical form</th>
@@ -59,69 +71,128 @@ to be equivalent to
         <td><code>(A . B)</code></td>
     </tr>
 </table>
-</p>
 
 <p>
     The lexer needs to know that the quote mark is a prefix (i.e., it can
     appear immediately before another token but is not necessarily a
     delimeter).
-<pre class="c">
-int lex(const char *str, const char **start, const char **end)
-{
-	const char *ws = " \t\n";
-	const char *delim = "() \t\n";
-	const char *prefix = "()<b>\'</b>";
-	.
-	.
-	.
+</p>
+
+<pre class="go">
+var (
+    // whitespace separates tokens and is generally ignored
+    whitespace = []byte{' ', '\t', '\r', '\n'}
+    // prefix characters can appear before another token but aren't
+    // necessarily delimiters
+    prefix = []byte{'(', ')', '\''}
+    // delimiters are characters that are not allowed in a symbol.
+    // at the minimum, this must include all whitespace and
+    // reserved characters.
+    delimiters = []byte{' ', '\t', '\r', '\n', '(', ')'}
+)
+</pre>
+
+<pre class="go">
+// lex extracts the next token from the input after skipping
+// comments and leading whitespace. on end of input, it
+// returns nil for both the token and the remainder.
+func lex(input []byte) (token []byte, remainder []byte) {
+    // skip whitespace
+    input = skipws(input)
+
+    // check for end of input
+    if len(input) == 0 {
+        return nil, nil
+    }
+
+    // check for prefix characters
+    if bytes.IndexByte(prefix, input[0]) >= 0 {
+        token, remainder = input[:1], input[1:]
+        return token, remainder
+    }
+    .
+    .
+    .
 }
 </pre>
-</p>
 
 <p>
     Also <code>read_expr</code> must convert it to the correct list
     expresssion.
 </p>
 
-<pre class="c">
-int read_expr(const char *input, const char **end, Atom *result)
-{
-	const char *token;
-	Error err;
+<pre class="go">
+// read_expr reads the next expression from the input. an expression is
+// either an atom or a list of expressions. returns the expression along
+// with the remainder of the input and any errors.
+// returns NIL and Error_EndOfInput on end of input. the caller must
+// decide how to handle it.
+// todo: result is not always updated by read. does that lead to bugs later?
+func read_expr(input []byte, result *Atom) (remainder []byte, err error) {
+    token, rest := lex(input)
+    if token == nil { // end of input
+        return nil, Error_EndOfInput
+    }
 
-	err = lex(input, &amp;token, end);
-	if (err)
-		return err;
-
-	if (token[0] == '(') {
-		return read_list(*end, end, result);
-	} else if (token[0] == ')') {
-		return Error_Syntax;
-	<b>} else if (token[0] == '\'') {
-		*result = cons(make_sym("QUOTE"), cons(nil, nil));
-		return read_expr(*end, end, &amp;car(cdr(*result)));</b>
-	} else {
-		return parse_simple(token, *end, result);
-	}
+    switch token[0] {
+    case '(':
+        return read_list(rest, result)
+    case ')':
+        // unexpected close paren
+        return nil, Error_Syntax
+    case '\'':
+        *result = cons(make_sym([]byte("QUOTE")), cons(_nil, _nil))
+        // set car(cdr(result))
+        return read_expr(rest, &result.value.pair.cdr.value.pair.car)
+    }
+    err = read_atom(token, result)
+    return rest, err
 }
 </pre>
 
 <h4>Testing</h4>
 
-<pre class="lisp">
-&gt; <b>(define x '(a b c))</b>
-X
-&gt; <b>x</b>
-(A B C)
-&gt; <b>'x</b>
-X
-&gt; <b>(define foo 'bar)</b>
-FOO
-&gt; <b>foo</b>
-BAR
-&gt; <b>''()</b>
-(QUOTE NIL)
-</pre>
+<table class="testing">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Input</th>
+        <th>Output</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>1</td>
+        <td>(define x '(a b c))</td>
+        <td>X</td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>x</td>
+        <td>(A B C)</td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>'x</td>
+        <td>X</td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td>(define foo 'bar)</td>
+        <td>FOO</td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>foo</td>
+        <td>BAR</td>
+    </tr>
+    <tr>
+        <td>6</td>
+        <td>''()</td>
+        <td>NIL</td>
+    </tr>
+    </tbody>
+</table>
 
 <h2>Function definitions</h2>
 
@@ -129,88 +200,157 @@ BAR
     It is cumbersome to have to type a lambda expression every time we wish
     to define a function, so we will modify the <code>DEFINE</code> operator
     to avoid this.
+</p>
+
 <pre class="lisp">
 (DEFINE (<i>name args...</i>) <i>body...</i>)
 </pre>
-is equivalent to
+
+<p>
+    is equivalent to
+</p>
+
 <pre class="lisp">
 (DEFINE <i>name</i> (LAMBDA (<i>args...</i>) <i>body...</i>))
 </pre>
-</p>
 
 <p>
     Here's how:
 </p>
 
-<pre class="c">
-int eval_expr(Atom expr, Atom env, Atom *result)
-{
-	.
-	.
-	.
-	if (op.type == AtomType_Symbol) {
-		if (strcmp(op.value.symbol, "QUOTE") == 0) {
-		.
-		.
-		.
-		} else if (strcmp(op.value.symbol, "DEFINE") == 0) {
-			Atom sym, val;
-
-			if (nilp(args) || nilp(cdr(args)))
-				return Error_Args;
-
-			sym = car(args);
-			if (sym.type == AtomType_Pair) {
-				err = make_closure(env, cdr(sym), cdr(args), &val);
-				sym = car(sym);
-				if (sym.type != AtomType_Symbol)
-					return Error_Type;
-			} else if (sym.type == AtomType_Symbol) {
-				if (!nilp(cdr(cdr(args))))
-					return Error_Args;
-				err = eval_expr(car(cdr(args)), env, &val);
-			} else {
-				return Error_Type;
-			}
-
-			if (err)
-				return err;
-
-			*result = sym;
-			return env_set(env, sym, val);
-		} else if (strcmp(op.value.symbol, "LAMBDA") == 0) {
-		.
-		.
-		.
-		}
-	}
-	.
-	.
-	.
+<pre class="go">
+// eval_expr evaluates an expression with a given environment and updates the result.
+// note that the result may not be updated if we find errors.
+func eval_expr(expr, env Atom, result *Atom) error {
+    .
+    .
+    .
+    op, args := car(expr), cdr(expr)
+    if op._type == AtomType_Symbol {
+        // evaluate special forms
+        if op.value.symbol.EqualString("QUOTE") {
+            .
+            .
+            .
+        } else if op.value.symbol.EqualString("DEFINE") {
+            // verify number and type of arguments
+            if nilp(args) || nilp(cdr(args)) {
+                return Error_Args
+            }
+            var val Atom
+            var err error
+            sym := car(args)
+            if sym._type == AtomType_Pair {
+                err = make_closure(env, cdr(sym), cdr(args), &val)
+                sym = car(sym)
+                if sym._type != AtomType_Symbol {
+                    return Error_Type
+                }
+            } else if sym._type == AtomType_Symbol {
+                if !nilp(cdr(cdr(args))) {
+                    return Error_Args
+                }
+                err = eval_expr(car(cdr(args)), env, &val)
+            } else {
+                return Error_Type
+            }
+            if err != nil {
+                return err
+            }
+            *result = sym
+            return env_set(env, sym, val)
+        } else if op.value.symbol.EqualString("LAMBDA") {
+            .
+            .
+            .
+        }
+    }
+    .
+    .
+    .
 }
+
 </pre>
 
 <h4>Testing</h4>
 
-<pre class="lisp">
-&gt; <b>(define (square x) (* x x))</b>
-SQUARE
-&gt; <b>(square 3)</b>
-9
-</pre>
+<table class="testing">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Input</th>
+        <th>Output</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>7</td>
+        <td>(define (square x) (* x x))</td>
+        <td>SQUARE</td>
+    </tr>
+    <tr>
+        <td>8</td>
+        <td>(square 3)</td>
+        <td>9</td>
+    </tr>
+    </tbody>
+</table>
 
 <p>
     Sweet!
 </p>
 
+<pre class="go">
+func TestChapter09(t *testing.T) {
+    env := env_create_default()
+
+    for _, tc := range []struct {
+        id     int
+        input  string
+        expect string
+        err    error
+    }{
+        {id: 1, input: "(define x '(a b c))", expect: "X"},
+        {id: 2, input: "x", expect: "(A B C)"},
+        {id: 3, input: "'x", expect: "X"},
+        {id: 4, input: "(define foo 'bar)", expect: "FOO"},
+        {id: 5, input: "foo", expect: "BAR"},
+        {id: 6, input: "''()", expect: "(QUOTE NIL)"},
+        {id: 7, input: "(define (square x) (* x x))", expect: "SQUARE"},
+        {id: 8, input: "(square 3)", expect: "9"},
+    } {
+        var expr Atom
+        _, err := read_expr([]byte(tc.input), &expr)
+        if err != nil {
+            t.Errorf("%d: read error: want nil: got %v\n", tc.id, err)
+            continue
+        }
+
+        var result Atom
+        err = eval_expr(expr, env, &result)
+
+        if tc.err == nil && err == nil {
+            // yay
+        } else if tc.err == nil && err != nil {
+            t.Errorf("%d: error: want nil: got %v\n", tc.id, err)
+        } else if !errors.Is(err, tc.err) {
+            t.Errorf("%d: error: want %v: got %v\n", tc.id, tc.err, err)
+        }
+        if got := result.String(); tc.expect != got {
+            t.Errorf("%d: eval: want %q: got %q\n", tc.id, tc.expect, got)
+        }
+    }
+}
+</pre>
+
 <hr/>
 <footer>
-	<p>
-		** <a href="../index.html">Home Page</a>
-		** <a href="../ch08/booleans.html">Chapter 8: Booleans and short-circuit evaluation</a>
-		** <a href="../ch10/variadics.html">Chapter 10: Variadic functions</a>
-		**
-	</p>
+    <p>
+        ** <a href="../index.html">Home Page</a>
+        ** <a href="../ch08/booleans.html">Chapter 8: Booleans and short-circuit evaluation</a>
+        ** <a href="../ch10/variadics.html">Chapter 10: Variadic functions</a>
+        **
+    </p>
 </footer>
 
 </body>
