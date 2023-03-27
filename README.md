@@ -9,9 +9,14 @@ This allows me to test changes, keep code and text in sync, and see how the code
 Naturally, all mistakes are mine.
 
 ## Copying
-The original text and source code is Copyright (C) 2023 by [Leo Uino](https://github.com/lwhjp).
+The original text and source code is Copyright (C) 2021 by
+[Leo Uino](https://github.com/lwhjp).
 All rights reserved.
 
-My changes to the text are Copyright (C) 2023, Michael D Henderson and are released under the CC [BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) license.
+All of my source code in this repository is released under the MIT license.
+Please see the file `LICENSE` in the root of this repository for the full license.
 
-All of my source code is Copyright (C) 2023, Michael D Henderson and is released under the MIT license.
+My changes to Leo Uino's text are released under the
+[GNU Free Documentation License (Version 1.3)](https://www.gnu.org/licenses/fdl-1.3.html).
+Please see the file `COPYING-docs` in the root of this repository for the full license.
+

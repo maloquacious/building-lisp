@@ -9,5 +9,7 @@
 .gitattributes      text eol=lf
 .gitignore          text eol=lf
 COPYING             text eol=lf
+COPYING-docs        text eol=lf
+LICENSE             text eol=lf
 go.mod              text eol=lf
 go.sum              text eol=lf
