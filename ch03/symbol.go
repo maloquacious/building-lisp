@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Michael D Henderson. All rights reserved.
 
-package ch03
+package lisp
 
 // Symbol implements data for a symbol.
 type Symbol struct {
