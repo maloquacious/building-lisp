@@ -74,8 +74,9 @@ var (
 var (
     // whitespace separates tokens and is generally ignored
     whitespace = []byte{' ', '\t', '\r', '\n'}
-    // reserved characters are part of the syntax of our lisp
-    reserved = []byte{'(', ')'}
+    // prefix characters can appear before another token but aren't
+    // necessarily delimiters
+    prefix = []byte{'(', ')', '\''}
     // delimiters are characters that are not allowed in a symbol.
     // at the minimum, this must include all whitespace and
     // reserved characters.
@@ -94,8 +95,8 @@ func lex(input []byte) (token []byte, remainder []byte) {
         return nil, nil
     }
 
-    // check for reserved tokens
-    if bytes.IndexByte(reserved, input[0]) >= 0 { // input is reserved
+    // check for prefix characters
+    if bytes.IndexByte(prefix, input[0]) >= 0 {
         token, remainder = input[:1], input[1:]
         return token, remainder
     }
