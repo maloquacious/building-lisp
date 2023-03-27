@@ -18,6 +18,8 @@
 
 <p>
     We shall extend the list expression syntax to add some new operators:
+</p>
+
 <dl>
     <dt><code>(CAR EXPR)</code>
     <dd>Evaluates <code>EXPR</code> and returns the <i>car</i> of the
@@ -34,11 +36,10 @@
         and returns a newly constructed pair containing the results.
     </dd>
 </dl>
-</p>
 
 <p>
     In the definitions above we allow taking the <i>car</i> and <i>cdr</i> of
-    <code>NIL</code>, unlike our C versions. Some algorithms are simpler to
+    <code>NIL</code>, unlike our Go versions. Some algorithms are simpler to
     express if the <i>car</i> and <i>cdr</i> of <code>NIL</code> are defined
     to be <code>NIL</code>.
 </p>
@@ -62,7 +63,7 @@
 </p>
 
 <p>
-    One way to implement these recipes is to create C functions which can
+    One way to implement these recipes is to create Go functions which can
     be called from <code>eval_expr</code>. We will call these <i>built-in</i>
     or <i>primitive</i> functions. Let's see how to extend our LISP
     interpreter to accommodate these.
@@ -73,92 +74,116 @@
 <p>
     <code>eval_expr</code> will call built-in functions through a C function
     pointer, so they must all have the same prototype:
-<pre class="c">
-typedef int (*Builtin)(struct Atom args, struct Atom *result);
-</pre>
 </p>
 
-<p>
-    In order to appear in expressions, we need a new kind of atom to
-    represent them.
-<pre class="c">
-struct Atom {
-	enum {
-		.
-		.
-		.
-		AtomType_Builtin
-	} type;
+<pre class="go">
+// Builtin is a helper for calling a native Go function.
+// We define a struct around it so that we can do
+// pointer comparisons for equality in other parts of this package.
+type Builtin struct {
+    fn Native
+}
 
-	union {
-		.
-		.
-		.
-		Builtin builtin;
-	} value;
-};
+// Native is a function in Go that can evaluate expressions.
+type Native func(args Atom) (Atom, error)
 </pre>
-Sections of code which we wrote previously are abbreviated as
-"<code>. . .</code>".
+
+<p>
+    In order to appear in expressions, we need a new kind of atom to represent them.
+    We'll add a new enum to our AtomType:
 </p>
 
+<pre class="go">
+// AtomType is the enum for the type of value in a cell.
+type AtomType int
+
+const (
+    // Nil represents the empty list.
+    AtomType_Nil AtomType = iota
+    // Builtin is a native function.
+    AtomType_Builtin
+    .
+    .
+    .
+</pre>
+
 <p>
-    For completeness, <code>print_expr</code> needs to know how to display
-    the new atom:
-<pre class="c">
-void print_expr(Atom atom)
-{
-	switch (atom.type) {
-	.
-	.
-	.
-	case AtomType_Builtin:
-		printf("#&lt;BUILTIN:%p&gt;", atom.value.builtin);
-		break;
-	}
+    Sections of code which we wrote previously are abbreviated as vertical ellipsis ("<code>. . .</code>").
+</p>
+
+
+<p>And then add it to our Atom struct:</p>p
+
+<pre class="go">
+// AtomValue is the value of an Atom.
+// It can be a simple type, like an integer or symbol, or a pointer to a Pair.
+type AtomValue struct {
+    builtin *Builtin
+    integer int
+    pair    *Pair
+    symbol  *Symbol
 }
 </pre>
+
+<p>
+    For completeness, <code>print_expr</code> needs to know how to display the new atom:
 </p>
+
+<pre class="go">
+// Write writes the value of an Atom to the writer.
+// If the atom is a pair, Write is called recursively
+// to write out the entire list.
+func (a Atom) Write(w io.Writer) (int, error) {
+    switch a._type {
+    case AtomType_Nil:
+        // atom is nil, so write "NIL"
+        return w.Write([]byte{'N', 'I', 'L'})
+    case AtomType_Builtin:
+        // atom is a native function
+        return w.Write([]byte(fmt.Sprintf("#&lt;BUILTIN:%p&gt;", a.value.builtin)))
+    .
+    .
+    .
+</pre>
 
 <p>
     And finally a helper function to create atoms of the new type:
-<pre class="c">
-Atom make_builtin(Builtin fn)
-{
-	Atom a;
-	a.type = AtomType_Builtin;
-	a.value.builtin = fn;
-	return a;
+</p>
+
+<pre class="go">
+// make_builtin returns an Atom on the stack.
+func make_builtin(fn Native) Atom {
+    return Atom{
+        _type: AtomType_Builtin,
+        value: AtomValue{
+            builtin: &Builtin{
+                fn: fn,
+            },
+        },
+    }
 }
 </pre>
-</p>
 
 <h2>Extending the evaluator</h2>
 
 <p>
-    We will need to create a <i>shallow copy</i> of the argument
-    list.
+    We will need to create a <i>shallow copy</i> of the argument list.
 </p>
 
-<pre class="c">
-Atom copy_list(Atom list)
-{
-	Atom a, p;
-
-	if (nilp(list))
-		return nil;
-
-	a = cons(car(list), nil);
-	p = a;
-	list = cdr(list);
-
-	while (!nilp(list)) {
-		cdr(p) = cons(car(list), nil);
-		p = cdr(p);
-		list = cdr(list);
-	}
-
-	return a;
+<pre class="go">
+// copy_list returns a shallow copy of a list.
+// todo: define "shallow copy" and why we would create one.
+func copy_list(list Atom) Atom {
+    if nilp(list) {
+        return _nil
+    }
+    a := cons(car(list), _nil)
+    p := a
+    for list = cdr(list); !nilp(list); list = cdr(list) {
+        setcdr(p, cons(car(list), _nil))
+        p = cdr(p)
+    }
+    return a
 }
 </pre>
 
@@ -168,13 +193,15 @@ Atom copy_list(Atom list)
     want to deal with other kinds of evaluation recipe.
 </p>
 
-<pre class="c">
-int apply(Atom fn, Atom args, Atom *result)
-{
-	if (fn.type == AtomType_Builtin)
-		return (*fn.value.builtin)(args, result);
-
-	return Error_Type;
+<pre class="go">
+// apply calls a native function with a list of arguments and updates the result.
+// note that the result may not be updated if we find errors.
+func apply(fn, args Atom, result *Atom) error {
+    if fn._type != AtomType_Builtin {
+        // it is an error to call this with anything other than a builtin
+        return Error_Type
+    }
+    return fn.value.builtin.fn(args, result)
 }
 </pre>
 
@@ -186,39 +213,38 @@ int apply(Atom fn, Atom args, Atom *result)
     results.
 </p>
 
-<pre class="c">
-int eval_expr(Atom expr, Atom env, Atom *result)
-{
-	Atom op, args, p;
-	Error err;
+<pre class="go">
+// eval_expr evaluates an expression with a given environment.
+// it returns the result and any errors.
+func eval_expr(expr, env Atom) (Atom, error) {
+    .
+    .
+    .
 
-	.
-	.
-	.
+    op, args := car(expr), cdr(expr)
+    if op._type == AtomType_Symbol {
+        .
+        .
+        .
+    }
 
-	if (op.type == AtomType_Symbol) {
-		.
-		.
-		.
-	}
+    // evaluate and update the operator
+    if err := eval_expr(op, env, &op); err != nil {
+        return err
+    }
 
-	/* Evaluate operator */
-	err = eval_expr(op, env, &amp;op);
-	if (err)
-		return err;
+    // evaluate arguments by calling eval on a copy of each.
+    // we have to make the copy, so we don't destroy the input.
+    args = copy_list(args)
+    for arg := args; !nilp(arg); arg = cdr(arg) {
+        // evaluate the arg and update its value
+        if err := eval_expr(car(arg), env, &arg.value.pair.car); err != nil {
+            return err
+        }
+    }
 
-	/* Evaulate arguments */
-	args = copy_list(args);
-	p = args;
-	while (!nilp(p)) {
-		err = eval_expr(car(p), env, &amp;car(p));
-		if (err)
-			return err;
-
-		p = cdr(p);
-	}
-
-	return apply(op, args, result);
+    // return the result of applying eval on our operator and arguments
+    return apply(op, args, result)
 }
 </pre>
 
@@ -240,20 +266,23 @@ int eval_expr(Atom expr, Atom env, Atom *result)
     The functions themselves:
 </p>
 
-<pre class="c">
-int builtin_car(Atom args, Atom *result)
-{
-	if (nilp(args) || !nilp(cdr(args)))
-		return Error_Args;
+<pre class="go">
+// builtin_car makes our native car function available to the interpreter.
+// note that the result may not be updated if we find errors.
+func builtin_car(args Atom, result *Atom) error {
+    // verify number and type of arguments
+    if nilp(args) || !nilp(cdr(args)) {
+        return Error_Args
+    } else if car(args)._type != AtomType_Pair {
+        return Error_Type
+    }
 
-	if (nilp(car(args)))
-		*result = nil;
-	else if (car(args).type != AtomType_Pair)
-		return Error_Type;
-	else
-		*result = car(car(args));
-
-	return Error_OK;
+    if nilp(car(args)) {
+        *result = _nil
+    } else {
+        *result = car(car(args))
+    }
+    return nil
 }
 </pre>
 
@@ -262,20 +291,23 @@ int builtin_car(Atom args, Atom *result)
     Creating functions in this way is pretty tedious.
 </p>
 
-<pre class="c">
-int builtin_cdr(Atom args, Atom *result)
-{
-	if (nilp(args) || !nilp(cdr(args)))
-		return Error_Args;
+<pre class="go">
+// builtin_cdr makes our native cdr function available to the interpreter.
+// note that the result may not be updated if we find errors.
+func builtin_cdr(args Atom, result *Atom) error {
+    // verify number and type of arguments
+    if nilp(args) || !nilp(cdr(args)) {
+        return Error_Args
+    } else if car(args)._type != AtomType_Pair {
+        return Error_Type
+    }
 
-	if (nilp(car(args)))
-		*result = nil;
-	else if (car(args).type != AtomType_Pair)
-		return Error_Type;
-	else
-		*result = cdr(car(args));
-
-	return Error_OK;
+    if nilp(car(args)) {
+        *result = _nil
+    } else {
+        *result = cdr(car(args))
+    }
+    return nil
 }
 </pre>
 
@@ -283,15 +315,17 @@ int builtin_cdr(Atom args, Atom *result)
     <code>builtin_cdr</code> is almost identical to <code>builtin_car</code>.
 </p>
 
-<pre class="c">
-int builtin_cons(Atom args, Atom *result)
-{
-	if (nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))))
-		return Error_Args;
+<pre class="go">
+// builtin_cons makes our native cons function available to the interpreter.
+// note that the result may not be updated if we find errors.
+func builtin_cons(args Atom, result *Atom) error {
+    // verify number and type of arguments
+    if nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))) {
+        return Error_Args
+    }
 
-	*result = cons(car(args), car(cdr(args)));
-
-	return Error_OK;
+    *result = cons(car(args), car(cdr(args)))
+    return nil
 }
 </pre>
 
@@ -300,45 +334,64 @@ int builtin_cons(Atom args, Atom *result)
     the bindings.
 </p>
 
-<pre class="c">
-int main(int argc, char **argv)
-{
-	Atom env;
-	char *input;
-
-	env = env_create(nil);
-
-	/* Set up the initial environment */
-	env_set(env, make_sym("CAR"), make_builtin(builtin_car));
-	env_set(env, make_sym("CDR"), make_builtin(builtin_cdr));
-	env_set(env, make_sym("CONS"), make_builtin(builtin_cons));
-
-	while ((input = readline("&gt; ")) != NULL) {
-		.
-		.
-		.
-	}
-
-	return 0;
+<pre class="go">
+// env_create_default creates a new environment with some native
+// functions added to the symbol table.
+func env_create_default() Atom {
+    // create a new environment
+    env := env_create(_nil)
+    // add the default list of native functions to the environment
+    env_set(env, make_sym([]byte("CAR")), make_builtin(builtin_car))
+    env_set(env, make_sym([]byte("CDR")), make_builtin(builtin_cdr))
+    env_set(env, make_sym([]byte("CONS")), make_builtin(builtin_cons))
+    // return the new environment
+    return env
 }
 </pre>
 
 <h4>Testing</h4>
 
-<pre class="lisp">
-&gt; <b>(define foo 1)</b>
-FOO
-&gt; <b>(define bar 2)</b>
-BAR
-&gt; <b>(cons foo bar)</b>
-(1 . 2)
-&gt; <b>(define baz (quote (a b c)))</b>
-BAZ
-&gt; <b>(car baz)</b>
-A
-&gt; <b>(cdr baz)</b>
-(B C)
-</pre>
+<table class="testing">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Input</th>
+        <th>Output</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>1</td>
+        <td>(define foo 1)</td>
+        <td>FOO</td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>(define bar 2)</td>
+        <td>BAR</td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>(cons foo bar)</td>
+        <td>(1 . 2)</td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td>(define baz (quote (a b c)))</td>
+        <td>BAZ</td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>(car baz)</td>
+        <td>A</td>
+    </tr>
+    <tr>
+        <td>6</td>
+        <td>(cdr baz)</td>
+        <td>(B C)</td>
+    </tr>
+    </tbody>
+</table>
 
 <p>
     Notice that <code>(CONS FOO BAR)</code> is <em>not</em> the same as
@@ -346,14 +399,55 @@ A
     are evaluated and a new pair is created.
 </p>
 
+<pre class="go">
+func TestChapter05(t *testing.T) {
+    env := env_create_default()
+
+    for _, tc := range []struct {
+        id     int
+        input  string
+        expect string
+        err    error
+    }{
+        {id: 1, input: "(define foo 1)", expect: "FOO"},
+        {id: 2, input: "(define bar 2)", expect: "BAR"},
+        {id: 3, input: "(cons foo bar)", expect: "(1 . 2)"},
+        {id: 4, input: "(define baz (quote (a b c)))", expect: "BAZ"},
+        {id: 5, input: "(car baz)", expect: "A"},
+        {id: 6, input: "(cdr baz)", expect: "(B C)"},
+    } {
+        var expr Atom
+        _, err := read_expr([]byte(tc.input), &expr)
+        if err != nil {
+            t.Errorf("%d: read error: want nil: got %v\n", tc.id, err)
+            continue
+        }
+
+        var result Atom
+        err = eval_expr(expr, env, &result)
+
+        if tc.err == nil && err == nil {
+            // yay
+        } else if tc.err == nil && err != nil {
+            t.Errorf("%d: error: want nil: got %v\n", tc.id, err)
+        } else if !errors.Is(err, tc.err) {
+            t.Errorf("%d: error: want %v: got %v\n", tc.id, tc.err, err)
+        }
+        if got := result.String(); tc.expect != got {
+            t.Errorf("%d: eval: want %q: got %q\n", tc.id, tc.expect, got)
+        }
+    }
+}
+</pre>
+
 <hr/>
 <footer>
-	<p>
-		** <a href="../index.html">Home Page</a>
-		** <a href="../ch04/expressions.html">Chapter 4: Expressions</a>
-		** <a href="../ch06/arithmetic.html">Chapter 6: Arithmetic</a>
-		**
-	</p>
+    <p>
+        ** <a href="../index.html">Home Page</a>
+        ** <a href="../ch04/expressions.html">Chapter 4: Expressions</a>
+        ** <a href="../ch06/arithmetic.html">Chapter 6: Arithmetic</a>
+        **
+    </p>
 </footer>
 
 </body>
