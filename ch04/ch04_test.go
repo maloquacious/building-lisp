@@ -23,7 +23,8 @@ func TestChapter04(t *testing.T) {
 		{id: 5, input: "(define foo (quote bar))", expect: "FOO"},
 		{id: 6, input: "foo", expect: "BAR"},
 	} {
-		expr, _, err := read_expr([]byte(tc.input))
+		var expr Atom
+		_, err := read_expr([]byte(tc.input), &expr)
 		if err != nil {
 			t.Errorf("%d: read error: want nil: got %v\n", tc.id, err)
 			continue
