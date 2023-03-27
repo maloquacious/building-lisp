@@ -39,7 +39,9 @@
     To associate identifiers with objects we need an <i>environment</i>.
     This is a collection of <i>bindings</i>, each of which consists of an
     identifier and its corresponding value. For example:
-<table border="1">
+</p>
+
+<table>
     <tr>
         <th colspan="2">Bindings</th>
     </tr>
@@ -60,9 +62,11 @@
         <td><code>(X Y Z)</code></td>
     </tr>
 </table>
-Note that the identifiers are all symbols, but the values can be any
-object within our system of data &mdash; the value for <code>BAZ</code>
-is a list containing three symbols.
+
+<p>
+    Note that the identifiers are all symbols, but the values can be any
+    object within our system of data &mdash; the value for <code>BAZ</code>
+    is a list containing three symbols.
 </p>
 
 <p>
@@ -78,77 +82,71 @@ is a list containing three symbols.
 <p>
     There is a convenient way of representing environments using our LISP
     data types:
+</p>
+
 <pre class="lisp">
 (<i>parent</i> (<i>identifier</i> . <i>value</i>)<i>...</i>)
 </pre>
-So the environment above (assuming it has no parent) is:
+
+<p>
+    So the environment above (assuming it has no parent) is:
+</p>
+
 <pre class="lisp">
 (NIL (FOO . 42) (BAR . NIL) (BAZ . (X Y Z)))
 </pre>
-</p>
 
 <p>
     Here is a function to create an empty environment with a specified
     parent (which could be <code>NIL</code>):
-<pre class="c">
-Atom env_create(Atom parent)
-{
-	return cons(parent, nil);
+</p>
+
+<pre class="go">
+// env_create creates a new environment.
+// if parent is not NIL, then parent is added to the environment.
+func env_create(parent Atom) Atom {
+    return cons(parent, _nil)
 }
 </pre>
-</p>
 
 <p>
     Next we have two functions to retrieve and create bindings in an
     environment.
 </p>
 
-<p>
-<pre class="c">
-int env_get(Atom env, Atom symbol, Atom *result)
-{
-	Atom parent = car(env);
-	Atom bs = cdr(env);
-
-	while (!nilp(bs)) {
-		Atom b = car(bs);
-		if (car(b).value.symbol == symbol.value.symbol) {
-			*result = cdr(b);
-			return Error_OK;
-		}
-		bs = cdr(bs);
-	}
-
-	if (nilp(parent))
-		return Error_Unbound;
-
-	return env_get(parent, symbol, result);
+<pre class="go">
+// env_get retrieves the binding for a symbol from the environment.
+func env_get(env, symbol Atom, result *Atom) (Atom, error) {
+    for bs := cdr(env); !nilp(bs); bs = cdr(bs) {
+        if b := car(bs); car(b).value.symbol == symbol.value.symbol {
+            return cdr(b), nil
+        }
+    }
+    // search the parent environment (if we have one).
+    if parent := car(env); !nilp(parent) {
+        return env_get(parent, symbol, result)
+    }
+    // not found, so return an unbound error
+    return _nil, Error_Unbound
 }
 </pre>
-Disallowing duplicate symbols means that we don't have to call
-<code>strcmp</code> here, which should mean that this lookup function
-is not too slow.
+
+<p>
+    Disallowing duplicate symbols means that we don't have to call
+    <code>strcmp</code> here, which should mean that this lookup function
+    is not too slow.
 </p>
 
-<pre class="c">
-int env_set(Atom env, Atom symbol, Atom value)
-{
-	Atom bs = cdr(env);
-	Atom b = nil;
-
-	while (!nilp(bs)) {
-		b = car(bs);
-		if (car(b).value.symbol == symbol.value.symbol) {
-			cdr(b) = value;
-			return Error_OK;
-		}
-		bs = cdr(bs);
-	}
-
-	b = cons(symbol, value);
-	cdr(env) = cons(b, cdr(env));
-
-	return Error_OK;
+<pre class="go">
+// env_set creates a binding for a symbol in the environment.
+func env_set(env, symbol, value Atom) {
+    for bs := cdr(env); !nilp(bs); bs = cdr(bs) {
+        if b := car(bs); car(b).value.symbol == symbol.value.symbol {
+            b.value.pair.cdr = value
+            return
+        }
+    }
+    setcdr(env, cons(cons(symbol, value), cdr(env)))
 }
 </pre>
 
@@ -172,30 +170,30 @@ int env_set(Atom env, Atom symbol, Atom value)
 
     <li>
         The environment allows us to determine a value for an identifier.
-        Attempting to evaluate an identifier for which no binding exists is an
-        error.
+        Attempting to evaluate an identifier for which no binding exists is an error.
     </li>
 
     <li>
-        A list expression with one of the following operators is called a
-        <i>special form</i>:
+        A list expression with one of the following operators is called a <i>special form</i>:
         <dl>
             <dt><code>QUOTE</code></dt>
-            <dd>The result of evaluating <code>(QUOTE EXPR)</code> is
-                <code>EXPR</code>, which is returned without evaluating.
+            <dd>
+                The result of evaluating <code>(QUOTE EXPR)</code> is <code>EXPR</code>, which is returned without
+                evaluating.
+            </dd>
             <dt><code>DEFINE</code></dt>
-            <dd>Evaluating <code>(DEFINE SYMBOL EXPR)</code> creates a binding
+            <dd>
+                Evaluating <code>(DEFINE SYMBOL EXPR)</code> creates a binding
                 for <code>SYMBOL</code> (or modifies an existing binding) in the
                 evaluation environment. <code>SYMBOL</code> is bound to the value
                 obtained by evaluating <code>EXPR</code>. The final result is
                 <code>SYMBOL</code>.
-        </dl>
+            </dd>
         </dl>
     </li>
 
     <li>
-        Anything else, including list expressions with any other operator, is
-        invalid.
+        Anything else, including list expressions with any other operator, is invalid.
     </li>
 </ul>
 
@@ -203,165 +201,134 @@ int env_set(Atom env, Atom symbol, Atom value)
 
 <p>
     We will need to check whether an expression is a proper list.
-<pre class="c">
-int listp(Atom expr)
-{
-	while (!nilp(expr)) {
-		if (expr.type != AtomType_Pair)
-			return 0;
-		expr = cdr(expr);
-	}
-	return 1;
+</p>
+
+<pre class="go">
+// listp returns true if the expression is a proper list or is NIL.
+func listp(expr Atom) bool {
+    for ; !nilp(expr); expr = cdr(expr) {
+        if expr._type != AtomType_Pair {
+            return false
+        }
+    }
+    return true
 }
 </pre>
-</p>
 
 <p>
-    The <code>Error</code> enumeration needs a few more entires:
-<table border="1">
-    <tr>
-        <td><code>Error_Unbound</code></td>
-        <td>Attempted to evaluate a symbol for which no binding exists</td>
-    </tr>
-    <tr>
-        <td><code>Error_Args</code></td>
-        <td>A list expression was shorter or longer than expected
-    </tr>
-    </td>
-    </tr>
-    <tr>
-        <td><code>Error_Type</code></td>
-        <td>An object in an expression was of a different type than expected</td>
-    </tr>
-</table>
+    We need to add a few more entries to our list of errors:
 </p>
+
+<pre class="go">
+// Error_Args is returned when a list expression was shorter or longer than anticipated.
+Error_Args = fmt.Errorf("args")
+
+// Error_Type is returned when an object in an expression isn't the expected type.
+Error_Type = fmt.Errorf("type")
+
+// Error_Unbound is returned when we attempt to evaluate an unbound symbol.
+Error_Unbound = fmt.Errorf("unbound")
+</pre>
 
 <p>
-    The function to perform evaluation is now a straightforward translation
-    of the rules into C.
+    The function to perform evaluation is now a straightforward translation of the rules into Go.
 </p>
 
-<pre class="c">
-int eval_expr(Atom expr, Atom env, Atom *result)
-{
-	Atom op, args;
-	Error err;
+<pre class="go">
+// eval_expr evaluates an expression with a given environment.
+// it returns the result and any errors.
+func eval_expr(expr, env Atom) (Atom, error) {
+    if expr._type == AtomType_Symbol {
+        return env_get(env, expr)
+    } else if expr._type != AtomType_Pair {
+        return expr, nil
+    } else if !listp(expr) {
+        return _nil, Error_Syntax
+    }
 
-	if (expr.type == AtomType_Symbol) {
-		return env_get(env, expr, result);
-	} else if (expr.type != AtomType_Pair) {
-		*result = expr;
-		return Error_OK;
-	}
+    op, args := car(expr), cdr(expr)
+    if op._type == AtomType_Symbol {
+        if op.value.symbol.EqualString("QUOTE") {
+            if nilp(args) || !nilp(cdr(args)) {
+                return _nil, Error_Args
+            }
+            return car(args), nil
+        } else if op.value.symbol.EqualString("DEFINE") {
+            if nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))) {
+                return _nil, Error_Args
+            }
+            sym := car(args)
+            if sym._type != AtomType_Symbol {
+                return _nil, Error_Type
+            }
+            val, err := eval_expr(car(cdr(args)), env)
+            if err != nil {
+                return _nil, err
+            }
+            env_set(env, sym, val)
+            return sym, nil
+        }
+    }
 
-	if (!listp(expr))
-		return Error_Syntax;
-
-	op = car(expr);
-	args = cdr(expr);
-
-	if (op.type == AtomType_Symbol) {
-		if (strcmp(op.value.symbol, "QUOTE") == 0) {
-			if (nilp(args) || !nilp(cdr(args)))
-				return Error_Args;
-
-			*result = car(args);
-			return Error_OK;
-		} else if (strcmp(op.value.symbol, "DEFINE") == 0) {
-			Atom sym, val;
-
-			if (nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))))
-				return Error_Args;
-
-			sym = car(args);
-			if (sym.type != AtomType_Symbol)
-				return Error_Type;
-
-			err = eval_expr(car(cdr(args)), env, &amp;val);
-			if (err)
-				return err;
-
-			*result = sym;
-			return env_set(env, sym, val);
-		}
-	}
-
-	return Error_Syntax;
+    return _nil, Error_Syntax
 }
 </pre>
 
 <h4>Testing</h4>
 
 <p>
-    Extending the read-print loop from the previous chapter, we now have a
-    read-eval-print loop (REPL). This is the core of our LISP interpreter.
+    Test cases.
 </p>
 
-<pre class="c">
-int main(int argc, char **argv)
-{
-	Atom env;
-	char *input;
-
-	env = env_create(nil);
-
-	while ((input = readline("&gt; ")) != NULL) {
-		const char *p = input;
-		Error err;
-		Atom expr, result;
-
-		err = read_expr(p, &amp;p, &amp;expr);		
-
-		if (!err)
-			err = eval_expr(expr, env, &amp;result);
-
-		switch (err) {
-		case Error_OK:
-			print_expr(result);
-			putchar('\n');
-			break;
-		case Error_Syntax:
-			puts("Syntax error");
-			break;
-		case Error_Unbound:
-			puts("Symbol not bound");
-			break;
-		case Error_Args:
-			puts("Wrong number of arguments");
-			break;
-		case Error_Type:
-			puts("Wrong type");
-			break;
-		}
-
-		free(input);
-	}
-
-	return 0;
-}
-</pre>
 
 <p>
-    Let's see what it can do.
+    Let's create some test cases and verify that it works.
 </p>
 
-<pre class="lisp">
-&gt; <b>foo</b>
-Symbol not bound
-&gt; <b>(quote foo)</b>
-FOO
-&gt; <b>(define foo 42)</b>
-FOO
-&gt; <b>foo</b>
-42
-&gt; <b>(define foo (quote bar))</b>
-FOO
-&gt; <b>foo</b>
-BAR
-</pre>
+<table class="testing">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Input</th>
+        <th>Output</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>1</td>
+        <td>foo</td>
+        <td>error: unbound</td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>(quote foo)</td>
+        <td>FOO</td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>(define foo 42)</td>
+        <td>FOO</td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td>foo</td>
+        <td>42</td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>(define foo (quote bar))</td>
+        <td>FOO</td>
+    </tr>
+    <tr>
+        <td>6</td>
+        <td>foo</td>
+        <td>BAR</td>
+    </tr>
+    </tbody>
+</table>
 
 <p>
-    We can now interactively assign names to objects.
+    We can now assign names to objects.
 </p>
 
 <hr/>
