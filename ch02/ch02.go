@@ -95,7 +95,7 @@ func make_int(x int) Atom {
 
 // sym_table is a global symbol table.
 // it is a list of all existing symbols.
-var sym_table = Atom{_type: AtomType_Nil}
+var sym_table = _nil
 
 // make_sym returns an Atom on the stack.
 // The name of the symbol is always converted to uppercase.
@@ -106,8 +106,8 @@ func make_sym(name []byte) Atom {
 	// make an upper-case copy of the name
 	name = bytes.ToUpper(name)
 	// search for any existing symbol with the same name
-	for atom := sym_table; !nilp(atom); atom = cdr(atom) {
-		if bytes.Equal(name, car(atom).value.symbol.label) {
+	for p := sym_table; !nilp(p); p = cdr(p) {
+		if atom := car(p); bytes.Equal(name, atom.value.symbol.label) {
 			// found match, so return the existing symbol
 			return atom
 		}

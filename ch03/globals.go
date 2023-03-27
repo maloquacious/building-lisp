@@ -12,4 +12,4 @@ var _nil = Atom{_type: AtomType_Nil}
 
 // sym_table is a global symbol table.
 // it is a list of all existing symbols.
-var sym_table = Atom{_type: AtomType_Nil}
+var sym_table = _nil

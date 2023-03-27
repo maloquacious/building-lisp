@@ -111,6 +111,9 @@ func TestChapter03(t *testing.T) {
 		}
 	}
 
+	// reset the symbol table
+	sym_table = _nil
+
 	// test the read function
 	for _, tc := range []struct {
 		id     int
@@ -124,10 +127,10 @@ func TestChapter03(t *testing.T) {
 		{id: 14, input: "(42)", expect: "(42)"},
 		{id: 15, input: "(foo)", expect: "(FOO)"},
 		{id: 16, input: "nil", expect: "NIL"},
+		{id: 17, input: "(quote foo)", expect: "(QUOTE FOO)"},
+		{id: 18, input: "(define foo 42)", expect: "(DEFINE FOO 42)"},
+		{id: 19, input: "(define foo (quote bar))", expect: "(DEFINE FOO (QUOTE BAR))"},
 	} {
-		// reset the symbol table
-		sym_table = _nil
-
 		input := []byte(tc.input)
 		expr, remainder, err := read(input)
 		got := expr.String()

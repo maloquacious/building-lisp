@@ -38,8 +38,8 @@ func make_sym(name []byte) Atom {
 	// make an upper-case copy of the name
 	name = bytes.ToUpper(name)
 	// search for any existing symbol with the same name
-	for atom := sym_table; !nilp(atom); atom = cdr(atom) {
-		if bytes.Equal(name, car(atom).value.symbol.label) {
+	for p := sym_table; !nilp(p); p = cdr(p) {
+		if atom := car(p); bytes.Equal(name, atom.value.symbol.label) {
 			// found match, so return the existing symbol
 			return atom
 		}
