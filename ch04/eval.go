@@ -3,39 +3,44 @@
 package lisp
 
 // eval_expr evaluates an expression with a given environment.
-// it returns the result and any errors.
-func eval_expr(expr, env Atom) (Atom, error) {
+// it updates result and returns any errors.
+// note that result isn't always updated when there are errors.
+func eval_expr(expr, env Atom, result *Atom) error {
 	if expr._type == AtomType_Symbol {
-		return env_get(env, expr)
+		return env_get(env, expr, result)
 	} else if expr._type != AtomType_Pair {
-		return expr, nil
+		*result = expr
+		return nil
 	} else if !listp(expr) {
-		return _nil, Error_Syntax
+		return Error_Syntax
 	}
 
 	op, args := car(expr), cdr(expr)
 	if op._type == AtomType_Symbol {
+		// evaluate special forms
 		if op.value.symbol.EqualString("QUOTE") {
 			if nilp(args) || !nilp(cdr(args)) {
-				return _nil, Error_Args
+				return Error_Args
 			}
-			return car(args), nil
+			*result = car(args)
+			return nil
 		} else if op.value.symbol.EqualString("DEFINE") {
 			if nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))) {
-				return _nil, Error_Args
+				return Error_Args
 			}
 			sym := car(args)
 			if sym._type != AtomType_Symbol {
-				return _nil, Error_Type
+				return Error_Type
 			}
-			val, err := eval_expr(car(cdr(args)), env)
-			if err != nil {
-				return _nil, err
+			var val Atom
+			if err := eval_expr(car(cdr(args)), env, &val); err != nil {
+				return err
 			}
 			env_set(env, sym, val)
-			return sym, nil
+			*result = sym
+			return nil
 		}
 	}
 
-	return _nil, Error_Syntax
+	return Error_Syntax
 }

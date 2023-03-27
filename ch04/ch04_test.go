@@ -29,7 +29,8 @@ func TestChapter04(t *testing.T) {
 			t.Errorf("%d: read error: want nil: got %v\n", tc.id, err)
 			continue
 		}
-		result, err := eval_expr(expr, env)
+		var result Atom
+		err = eval_expr(expr, env, &result)
 		if tc.err == nil && err == nil {
 			// yay
 		} else if tc.err == nil && err != nil {

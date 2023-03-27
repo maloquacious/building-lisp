@@ -9,18 +9,20 @@ func env_create(parent Atom) Atom {
 }
 
 // env_get retrieves the binding for a symbol from the environment.
-func env_get(env, symbol Atom) (Atom, error) {
+// does not update result unless it finds a symbol in the environment.
+func env_get(env, symbol Atom, result *Atom) error {
 	for bs := cdr(env); !nilp(bs); bs = cdr(bs) {
 		if b := car(bs); car(b).value.symbol == symbol.value.symbol {
-			return cdr(b), nil
+			*result = cdr(b)
+			return nil
 		}
 	}
 	// search the parent environment (if we have one).
 	if parent := car(env); !nilp(parent) {
-		return env_get(parent, symbol)
+		return env_get(parent, symbol, result)
 	}
 	// not found, so return an unbound error
-	return _nil, Error_Unbound
+	return Error_Unbound
 }
 
 // env_set creates a binding for a symbol in the environment.
