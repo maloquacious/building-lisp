@@ -17,10 +17,11 @@
 
 <p>
     A lambda expression is a list expression with a particular syntax:
+</p>
+
 <pre class="lisp">
 (LAMBDA (<i>arg...</i>) <i>expr...</i>)
 </pre>
-</p>
 
 <p>
     The result of evaluating a <code>LAMBDA</code> expression is a new
@@ -52,9 +53,13 @@
 
 <p>
     We will represent the closure using a list:
+</p>
+
 <pre class="lisp">
 (<i>env</i> (<i>arg...</i>) <i>expr...</i>)
 </pre>
+
+<p>
 <code>env</code> is the environment in which the closure was defined.
 This is needed to allow the lambda function to use bindings without
 having to pass them as arguments. For example, recall that
@@ -65,22 +70,24 @@ having to pass them as arguments. For example, recall that
 <p>
     The first task is to add a new constant for the <code>type</code> field
     of our <code>Atom</code> structure:
-<pre class="c">
-struct Atom {
-	enum {
-		.
-		.
-		.
-		AtomType_Closure
-	} type;
+</p>
 
-	union {
-		.
-		.
-		.
-	} value;
-};
+<pre class="go">
+// AtomType is the enum for the type of value in a cell.
+type AtomType int
+
+const (
+    .
+    .
+    .
+    AtomType_Closure
+    .
+    .
+    .
+)
 </pre>
+
+<p>
 Since the closure is just a regular list, there is no need to add anything
 to <code>value</code>.
 </p>
@@ -91,26 +98,34 @@ to <code>value</code>.
     some validation of the arguments and so needs to return an error code.
 </p>
 
-<pre class="c">
-int make_closure(Atom env, Atom args, Atom body, Atom *result)
-{
-	Atom p;
+<pre class="go">
+// make_closure returns an Atom on the stack.
+// a closure is a list that binds the environment and arguments.
+// note that result may not be updated if there are errors.
+func make_closure(env, args, body Atom, result *Atom) error {
+    // verify number and type of arguments
+    if !listp(args) || !listp(body) {
+        return Error_Syntax
+    }
+    // verify that all arguments are all symbols.
+    // if not, return an error.
+    for p := args; !nilp(p); p = cdr(p) {
+        if car(p)._type != AtomType_Symbol {
+            return Error_Type
+        }
+    }
 
-	if (!listp(args) || !listp(body))
-		return Error_Syntax;
-
-	/* Check argument names are all symbols */
-	p = args;
-	while (!nilp(p)) {
-		if (car(p).type != AtomType_Symbol)
-			return Error_Type;
-		p = cdr(p);
-	}
-
-	*result = cons(env, cons(args, body));
-	result->type = AtomType_Closure;
-
-	return Error_OK;
+    // bind the environment and arguments to the closure
+    *result = Atom{
+        _type: AtomType_Closure,
+        value: AtomValue{
+            pair: &Pair{
+                car: env,
+                cdr: cons(args, body),
+            },
+        },
+    }
+    return nil
 }
 </pre>
 
@@ -122,24 +137,53 @@ int make_closure(Atom env, Atom args, Atom body, Atom *result)
 <pre class="c">
 int eval_expr(Atom expr, Atom env, Atom *result)
 {
-	.
-	.
-	.
-	if (op.type == AtomType_Symbol) {
-		if (strcmp(op.value.symbol, "QUOTE") == 0) {
-		.
-		.
-		.
-		} else if (strcmp(op.value.symbol, "LAMBDA") == 0) {
-			if (nilp(args) || nilp(cdr(args)))
-				return Error_Args;
+    .
+    .
+    .
+    if (op.type == AtomType_Symbol) {
+        if (strcmp(op.value.symbol, "QUOTE") == 0) {
+        .
+        .
+        .
+        } else if (strcmp(op.value.symbol, "LAMBDA") == 0) {
+            if (nilp(args) || nilp(cdr(args)))
+                return Error_Args;
 
-			return make_closure(env, car(args), cdr(args), result);
-		}
-	}
-	.
-	.
-	.
+            return make_closure(env, car(args), cdr(args), result);
+        }
+    }
+    .
+    .
+    .
+}
+// eval_expr evaluates an expression with a given environment and updates the result.
+// note that the result may not be updated if we find errors.
+func eval_expr(expr, env Atom, result *Atom) error {
+    .
+    .
+    .
+    op, args := car(expr), cdr(expr)
+    if op._type == AtomType_Symbol {
+        // evaluate special forms
+        if op.value.symbol.EqualString("QUOTE") {
+            .
+            .
+            .
+        } else if op.value.symbol.EqualString("DEFINE") {
+            .
+            .
+            .
+        } else if op.value.symbol.EqualString("LAMBDA") {
+            // verify number and type of arguments
+            if nilp(args) || nilp(cdr(args)) {
+                return Error_Args
+            }
+            return make_closure(env, car(args), cdr(args), result)
+        }
+    }
+    .
+    .
+    .
 }
 </pre>
 
@@ -147,11 +191,14 @@ int eval_expr(Atom expr, Atom env, Atom *result)
     The body of our <code>SQUARE</code> example above is expressed in terms
     of <code>X</code>. In order to evaluate the body, we need to create a new
     environment with <code>X</code> bound to the value of the argument:
+<p>
+
 <pre class="lisp">
 (<i>closure-env</i> (X . 3))
 </pre>
-where the parent environment <code>closure-env</code> is the environment
-that was stored in the closure.
+
+<p>
+    where the parent environment <code>closure-env</code> is the environment that was stored in the closure.
 </p>
 
 <p>
@@ -159,40 +206,48 @@ that was stored in the closure.
     call <code>eval</code> for each expression in the body.
 </p>
 
-<pre class="c">
-int apply(Atom fn, Atom args, Atom *result)
-{
-	Atom env, arg_names, body;
+<pre class="go">
+// apply calls a native function with a list of arguments and updates the result.
+// note that the result may not be updated if we find errors.
+func apply(fn, args Atom, result *Atom) error {
+    // handle builtins
+    if fn._type == AtomType_Builtin {
+        return fn.value.builtin.fn(args, result)
+    }
 
-	if (fn.type == AtomType_Builtin)
-		return (*fn.value.builtin)(args, result);
-	else if (fn.type != AtomType_Closure)
-		return Error_Type;
+    // handle closure
+    if fn._type == AtomType_Closure {
+        // create a new environment for the closure
+        env := env_create(car(fn))
 
-	env = env_create(car(fn));
-	arg_names = car(cdr(fn));
-	body = cdr(cdr(fn));
+        // bind the arguments
+        for arg_names := car(cdr(fn)); !nilp(arg_names); arg_names = cdr(arg_names) {
+            if nilp(args) {
+                // not enough arguments passed in to bind against
+                return Error_Args
+            }
+            // put the name and value into the environment
+            env_set(env, car(arg_names), car(args))
+            // move on to the next argument
+            args = cdr(args)
+        }
+        if !nilp(args) {
+            // too many arguments to bind against
+            return Error_Args
+        }
 
-	/* Bind the arguments */
-	while (!nilp(arg_names)) {
-		if (nilp(args))
-			return Error_Args;
-		env_set(env, car(arg_names), car(args));
-		arg_names = cdr(arg_names);
-		args = cdr(args);
-	}
-	if (!nilp(args))
-		return Error_Args;
+        // evaluate every expression in the body
+        for body := cdr(cdr(fn)); !nilp(body); body = cdr(body) {
+            if err := eval_expr(car(body), env, result); err != nil {
+                return err
+            }
+        }
 
-	/* Evaluate the body */
-	while (!nilp(body)) {
-		Error err = eval_expr(car(body), env, result);
-		if (err)
-			return err;
-		body = cdr(body);
-	}
+        return nil
+    }
 
-	return Error_OK;
+    // any other type is an error
+    return Error_Type
 }
 </pre>
 
@@ -241,12 +296,12 @@ ADD-TWO
 
 <hr/>
 <footer>
-	<p>
-		** <a href="../index.html">Home Page</a>
-		** <a href="../ch06/arithmetic.html">Chapter 6: Arithmetic</a>
-		** <a href="../ch08/booleans.html">Chapter 8: Booleans and short-circuit evaluation</a>
-		**
-	</p>
+    <p>
+        ** <a href="../index.html">Home Page</a>
+        ** <a href="../ch06/arithmetic.html">Chapter 6: Arithmetic</a>
+        ** <a href="../ch08/booleans.html">Chapter 8: Booleans and short-circuit evaluation</a>
+        **
+    </p>
 </footer>
 
 </body>
