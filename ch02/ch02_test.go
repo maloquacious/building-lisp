@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestPrintExpr(t *testing.T) {
+func TestChapter02(t *testing.T) {
 	mksym := func(s string) Atom {
 		return make_sym([]byte(s))
 	}
