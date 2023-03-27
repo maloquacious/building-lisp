@@ -1,12 +1,10 @@
 // Copyright (c) 2023 Michael D Henderson. All rights reserved.
 
-package ch02
+package lisp
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 )
 
@@ -36,101 +34,6 @@ type AtomValue struct {
 	integer int
 	pair    *Pair
 	symbol  *Symbol
-}
-
-// Pair is the two elements of a cell.
-// "car" is the left-hand value and "cdr" is the right-hand.
-type Pair struct {
-	car, cdr Atom
-}
-
-// Symbol implements data for a symbol.
-type Symbol struct {
-	label []byte
-}
-
-// car returns the first item from a list.
-// It will panic if p is not a Pair
-func car(p Atom) Atom {
-	return p.value.pair.car
-}
-
-// cdr returns the remainder of a list.
-// It will panic if p is not a Pair
-func cdr(p Atom) Atom {
-	return p.value.pair.cdr
-}
-
-// nilp is a predicate function. It returns true if the atom is NIL.
-func nilp(atom Atom) bool {
-	return atom._type == AtomType_Nil
-}
-
-// _nil is the NIL symbol.
-// This should be immutable, so don't change it!
-var _nil = Atom{_type: AtomType_Nil}
-
-// cons returns a new Pair created on the heap.
-func cons(car, cdr Atom) Atom {
-	return Atom{
-		_type: AtomType_Pair,
-		value: AtomValue{
-			pair: &Pair{
-				car: car,
-				cdr: cdr,
-			},
-		},
-	}
-}
-
-// make_int returns an Atom on the stack.
-func make_int(x int) Atom {
-	return Atom{
-		_type: AtomType_Integer,
-		value: AtomValue{
-			integer: x,
-		},
-	}
-}
-
-// sym_table is a global symbol table.
-// it is a list of all existing symbols.
-var sym_table = _nil
-
-// make_sym returns an Atom on the stack.
-// The name of the symbol is always converted to uppercase.
-// If the symbol already exists in the global symbol table, that symbol is
-// returned. Otherwise, a new symbol is created on the stack, added to the
-// symbol table, and returned. The new symbol allocates space for the name.
-func make_sym(name []byte) Atom {
-	// make an upper-case copy of the name
-	name = bytes.ToUpper(name)
-	// search for any existing symbol with the same name
-	for p := sym_table; !nilp(p); p = cdr(p) {
-		if atom := car(p); bytes.Equal(name, atom.value.symbol.label) {
-			// found match, so return the existing symbol
-			return atom
-		}
-	}
-	// did not find a matching symbol, so create a new one
-	atom := Atom{
-		_type: AtomType_Symbol,
-		value: AtomValue{
-			symbol: &Symbol{
-				label: name,
-			},
-		},
-	}
-	// add it to the symbol_table
-	sym_table = cons(atom, sym_table)
-	// and return it
-	return atom
-}
-
-// print_expr is a helper function to write an expression
-// to stdout, ignoring errors.
-func print_expr(expr Atom) {
-	_, _ = expr.Write(os.Stdout)
 }
 
 // Write writes the value of an Atom to the writer.
