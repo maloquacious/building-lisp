@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Michael D Henderson. All rights reserved.
 
-package ch04
+package lisp
 
 // this file defines all the global variables used by the implementation.
 // because the implementation uses globals rather than passing state,

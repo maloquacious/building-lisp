@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Michael D Henderson. All rights reserved.
 
-package ch04
+package lisp
 
 // env_create creates a new environment.
 // if parent is not NIL, then parent is added to the environment.

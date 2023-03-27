@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Michael D Henderson. All rights reserved.
 
-package ch04
+package lisp
 
 // car returns the first item from a list.
 // It will panic if p is not a Pair
