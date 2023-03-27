@@ -20,55 +20,44 @@
     The argument declarations for variadic functions are improper lists:
 </p>
 
-<table border="1">
+<table>
+    <thead>
     <tr>
-        <th/>
+        <th></th>
         <th>&lambda;-syntax</th>
         <th>Combined <code>DEFINE</code></th>
     </tr>
+    </thead>
+    <tbody>
     <tr>
         <th>3 args</th>
-        <td>
-            <code>(LAMBDA (arg1 arg2 arg3) <i>body...</i>)</code>
-        </td>
-        <td>
-            <code>(DEFINE (<i>name</i> arg1 arg2 arg3) <i>body...</i>)</code>
-        </td>
+        <td><code>(LAMBDA (arg1 arg2 arg3) <i>body...</i>)</code></td>
+        <td><code>(DEFINE (<i>name</i> arg1 arg2 arg3) <i>body...</i>)</code></td>
     </tr>
     <tr>
         <th>&ge;2 args</th>
-        <td>
-            <code>(LAMBDA (arg1 arg2 . rest) <i>body...</i>)</code>
-        </td>
-        <td>
-            <code>(DEFINE (<i>name</i> arg1 arg2 . rest) <i>body...</i>)</code>
-        </td>
+        <td><code>(LAMBDA (arg1 arg2 . rest) <i>body...</i>)</code></td>
+        <td><code>(DEFINE (<i>name</i> arg1 arg2 . rest) <i>body...</i>)</code></td>
     </tr>
     <tr>
         <th>&ge;1 args</th>
-        <td>
-            <code>(LAMBDA (arg1 . rest) <i>body...</i>)</code>
-        </td>
-        <td>
-            <code>(DEFINE (<i>name</i> arg1 . rest) <i>body...</i>)</code>
-        </td>
+        <td><code>(LAMBDA (arg1 . rest) <i>body...</i>)</code></td>
+        <td><code>(DEFINE (<i>name</i> arg1 . rest) <i>body...</i>)</code></td>
     </tr>
     <tr>
         <th>&ge;0 args</th>
-        <td>
-            <code>(LAMBDA args <i>body...</i>)</code>
-        </td>
-        <td>
-            <code>(DEFINE (<i>name</i> . args) <i>body...</i>)</code>
-        </td>
+        <td><code>(LAMBDA args <i>body...</i>)</code></td>
+        <td><code>(DEFINE (<i>name</i> . args) <i>body...</i>)</code></td>
     </tr>
+    </tbody>
 </table>
 
 <p>
     In the definitions above, the parameters are bound as follows:
 </p>
 
-<table border="1">
+<table>
+    <thead>
     <tr>
         <th rowspan="2">Definition</th>
         <th colspan="3"><code>(f 1 2 3)</code></th>
@@ -78,6 +67,8 @@
         <th>Value of <code>b</code></th>
         <th>Value of <code>c</code></th>
     </tr>
+
+    </thead>
     <tr>
         <td><code>(DEFINE (f a b c) <i>body...</i>)</code></td>
         <td><code>1</code></td>
@@ -106,64 +97,78 @@
 <p>
     All that is required is a small modification to
     <code>make_closure</code> to accept the declaration:
-<pre class="c">
-int make_closure(Atom env, Atom args, Atom body, Atom *result)
-{
-	Atom p;
+</p>
 
-	<b>if (!listp(body))</b>
-		return Error_Syntax;
+<pre class="go">
+// make_closure returns an Atom on the stack.
+// a closure is a list that binds the environment and arguments.
+// note that result may not be updated if there are errors.
+func make_closure(env, args, body Atom, result *Atom) error {
+    // verify number and type of arguments
+    if !listp(body) {
+        return Error_Syntax
+    }
+    // verify arguments.
+    // if we find a symbol, stop checking.
+    // if we find something that is not a pair with a symbol in the cdr, return an error.
+    for p := args; !nilp(p) && p._type != AtomType_Symbol; p = cdr(p) {
+        if p._type != AtomType_Pair || car(p)._type != AtomType_Symbol {
+            return Error_Type
+        }
+    }
 
-	/* Check argument names are all symbols */
-	p = args;
-	while (!nilp(p)) {
-		<b>if (p.type == AtomType_Symbol)
-			break;
-		else if (p.type != AtomType_Pair
-				|| car(p).type != AtomType_Symbol)
-			return Error_Type;</b>
-		p = cdr(p);
-	}
-
-	*result = cons(env, cons(args, body));
-	result->type = AtomType_Closure;
-
-	return Error_OK;
+    // bind the environment and arguments to the closure
+    *result = Atom{
+        _type: AtomType_Closure,
+        value: AtomValue{
+            pair: &Pair{
+                car: env,
+                cdr: cons(args, body),
+            },
+        },
+    }
+    return nil
 }
 </pre>
-</p>
 
 <p>
     And another to <code>apply</code> to bind the additional arguments
     into a list:
-<pre class="c">
-int apply(Atom fn, Atom args, Atom *result)
-{
-	.
-	.
-	.
-	/* Bind the arguments */
-	while (!nilp(arg_names)) {
-		<b>if (arg_names.type == AtomType_Symbol) {
-			env_set(env, arg_names, args);
-			args = nil;
-			break;
-		}</b>
+</p>
 
-		if (nilp(args))
-			return Error_Args;
-		env_set(env, car(arg_names), car(args));
-		arg_names = cdr(arg_names);
-		args = cdr(args);
-	}
-	if (!nilp(args))
-		return Error_Args;
-	.
-	.
-	.
+<pre class="go">
+// apply calls a native function with a list of arguments and updates the result.
+// note that the result may not be updated if we find errors.
+func apply(fn, args Atom, result *Atom) error {
+    .
+    .
+    .
+    // handle closure
+    if fn._type == AtomType_Closure {
+        // create a new environment for the closure
+        env := env_create(car(fn))
+
+        // bind the arguments
+        for arg_names := car(cdr(fn)); !nilp(arg_names); arg_names = cdr(arg_names) {
+            // if arg name is a symbol, apply it as rest of arguments
+            if arg_names._type == AtomType_Symbol {
+                _ = env_set(env, arg_names, args)
+                args = _nil
+                break
+            }
+            .
+            .
+            .
+        }
+        .
+        .
+        .
+    }
+    .
+    .
+    .
 }
 </pre>
-</p>
 
 <h4>Testing</h4>
 
@@ -171,40 +176,121 @@ int apply(Atom fn, Atom args, Atom *result)
     A boring example:
 </p>
 
-<pre class="lisp">
-&gt; <b>((lambda (a . b) a) 1 2 3)</b>
-1
-&gt; <b>((lambda (a . b) b) 1 2 3)</b>
-(2 3)
-&gt; <b>((lambda args args) 1 2 3)</b>
-(1 2 3)
-</pre>
+<table class="testing">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Input</th>
+        <th>Output</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>1</td>
+        <td>((lambda (a . b) a) 1 2 3)</td>
+        <td>1</td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>((lambda (a . b) b) 1 2 3)</td>
+        <td>(2 3)</td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>((lambda args args) 1 2 3)</td>
+        <td>(1 2 3)</td>
+    </tr>
+    </tbody>
+</table>
 
 <p>
     We can also create a variadic adder:
 </p>
 
-<pre class="lisp">
-&gt; <b>(define (sum-list xs)
-    (if xs
-        (+ (car xs) (sum-list (cdr xs)))
-        0))</b>
-SUM-LIST
-&gt; <b>(sum-list '(1 2 3))</b>
-6
-&gt; <b>(define (add . xs) (sum-list xs))</b>
-ADD
-&gt; <b>(add 1 2 3)</b>
-6
-&gt; <b>(add 1 (- 4 2) (/ 9 3))</b>
-6
-</pre>
+<table class="testing">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Input</th>
+        <th>Output</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>4</td>
+        <td>(define (sum-list xs)(if xs(+ (car xs) (sum-list (cdr xs)))0))</td>
+        <td>SUM-LIST</td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>(sum-list '(1 2 3))</td>
+        <td>6</td>
+    </tr>
+    <tr>
+        <td>6</td>
+        <td>(define (add . xs) (sum-list xs))</td>
+        <td>ADD</td>
+    </tr>
+    <tr>
+        <td>7</td>
+        <td>(add 1 2 3)</td>
+        <td>6</td>
+    </tr>
+    <tr>
+        <td>8</td>
+        <td>(add 1 (- 4 2) (/ 9 3))</td>
+        <td>6</td>
+    </tr>
+    </tbody>
+</table>
 
 <p>
     Since you can always pass a list to a regular function, this is
     really just another kind of syntactic sugar.
 </p>
 
+<pre class="go">
+func TestChapter10(t *testing.T) {
+    env := env_create_default()
+
+    for _, tc := range []struct {
+        id     int
+        input  string
+        expect string
+        err    error
+    }{
+        {id: 1, input: "((lambda (a . b) a) 1 2 3)", expect: "1"},
+        {id: 2, input: "((lambda (a . b) b) 1 2 3)", expect: "(2 3)"},
+        {id: 3, input: "((lambda args args) 1 2 3)", expect: "(1 2 3)"},
+        {id: 4, input: "(define (sum-list xs) (if xs (+ (car xs) (sum-list (cdr xs))) 0))", expect: "SUM-LIST"},
+        {id: 5, input: "(sum-list '(1 2 3))", expect: "6"},
+        {id: 6, input: "(define (add . xs) (sum-list xs))", expect: "ADD"},
+        {id: 7, input: "(add 1 2 3)", expect: "6"},
+        {id: 8, input: "(add 1 (- 4 2) (/ 9 3))", expect: "6"},
+    } {
+        var expr Atom
+        _, err := read_expr([]byte(tc.input), &expr)
+        if err != nil {
+            t.Errorf("%d: read error: want nil: got %v\n", tc.id, err)
+            continue
+        }
+
+        var result Atom
+        err = eval_expr(expr, env, &result)
+
+        if tc.err == nil && err == nil {
+            // yay
+        } else if tc.err == nil && err != nil {
+            t.Errorf("%d: error: want nil: got %v\n", tc.id, err)
+        } else if !errors.Is(err, tc.err) {
+            t.Errorf("%d: error: want %v: got %v\n", tc.id, tc.err, err)
+        }
+        if got := result.String(); tc.expect != got {
+            t.Errorf("%d: eval: want %q: got %q\n", tc.id, tc.expect, got)
+        }
+    }
+}
+</pre>
 <hr/>
 <footer>
     <p>
