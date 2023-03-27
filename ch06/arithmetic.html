@@ -22,37 +22,37 @@
     operations.
 </p>
 
-<table border="1">
+<table>
+    <thead>
     <tr>
         <th>Expression</th>
         <th>Result</th>
     </tr>
+    </thead>
+    <tbody>
     <tr>
         <td><code>(+ X Y)</code></td>
-        <td>The sum of <code>X</code> and <code>Y</code>
-        </td>
+        <td>The sum of <code>X</code> and <code>Y</code></td>
     </tr>
     <tr>
         <td><code>(- X Y)</code></td>
-        <td>The difference of <code>X</code> and <code>Y</code>
-        </td>
+        <td>The difference of <code>X</code> and <code>Y</code></td>
     </tr>
     <tr>
         <td><code>(* X Y)</code></td>
-        <td>The product of <code>X</code> and <code>Y</code>
-        </td>
+        <td>The product of <code>X</code> and <code>Y</code></td>
     </tr>
     <tr>
         <td><code>(/ X Y)</code></td>
-        <td>The quotient of <code>X</code> and <code>Y</code>
-        </td>
+        <td>The quotient of <code>X</code> and <code>Y</code></td>
     </tr>
+    </tbody>
 </table>
 
 <p>
     In the definitions above, when we write "the sum of <code>X</code> and
     <code>Y</code>", what we really mean is "the sum of <em>the values
-    obtained by evaluating</em> <code>X</code> and <code>Y</code>".
+        obtained by evaluating</em> <code>X</code> and <code>Y</code>".
     Remember that <code>eval_expr</code> will evaluate all the arguments
     to a functions by default; this is usually what we want to happen, so from
     now on we will not explicitly state this where the intent is obvious.
@@ -66,41 +66,49 @@
     the call to <code>make_int</code>.
 </p>
 
-<pre class="c">
-int builtin_add(Atom args, Atom *result)
-{
-	Atom a, b;
+<pre class="go">
+// builtin_add implements a function for calculating the sum of two numbers.
+// note that the result may not be updated if we find errors.
+func builtin_add(args Atom, result *Atom) error {
+    // verify number and type of arguments
+    if nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))) {
+        return Error_Args
+    }
+    a, b := car(args), car(cdr(args))
+    if a._type != AtomType_Integer || b._type != AtomType_Integer {
+        return Error_Type
+    }
 
-	if (nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))))
-		return Error_Args;
-
-	a = car(args);
-	b = car(cdr(args));
-
-	if (a.type != AtomType_Integer || b.type != AtomType_Integer)
-		return Error_Type;
-
-	*result = make_int(a.value.integer + b.value.integer);
-
-	return Error_OK;
+    *result = make_int(a.value.integer + b.value.integer)
+    return nil
 }
 </pre>
 
 <p>
-    The other three functions differ by only one character, so I will omit
-    them here.
+    The other three functions differ by only one character, so I will omit them here.
+    (One note: divide will panic on divide by zero.)
 </p>
 
 <p>
-    Finally we need to create bindings for our new functions in the initial
-    environment:
-<pre class="c">
-env_set(env, make_sym("+"), make_builtin(builtin_add));
-env_set(env, make_sym("-"), make_builtin(builtin_subtract));
-env_set(env, make_sym("*"), make_builtin(builtin_multiply));
-env_set(env, make_sym("/"), make_builtin(builtin_divide));
-</pre>
+    Finally we need to create bindings for our new functions in the initial environment:
 </p>
+
+<pre class="go">
+// env_create_default creates a new environment with some native
+// functions added to the symbol table.
+func env_create_default() Atom {
+    .
+    .
+    .
+    env_set(env, make_sym([]byte{'+'}), make_builtin(builtin_add));
+    env_set(env, make_sym([]byte{'-'}), make_builtin(builtin_subtract));
+    env_set(env, make_sym([]byte{'*'}), make_builtin(builtin_multiply));
+    env_set(env, make_sym([]byte{'/'}), make_builtin(builtin_divide));
+
+    // return the new environment
+    return env
+}
+</pre>
 
 <h4>Testing</h4>
 
@@ -108,26 +116,89 @@ env_set(env, make_sym("/"), make_builtin(builtin_divide));
     We now have our very own LISP-style calculator.
 </p>
 
-<pre class="lisp">
-&gt; <b>(+ 1 1)</b>
-2
-&gt; <b>(define x (* 6 9))</b>
-X
-&gt; <b>x</b>
-54
-&gt; <b>(- x 12)</b>
-42
-</pre>
+<table class="testing">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Input</th>
+        <th>Output</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>1</td>
+        <td>(+ 1 1)</td>
+        <td>FOO</td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>(define x (* 6 9))</td>
+        <td>X</td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>x</td>
+        <td>54</td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td>(- x 12)</td>
+        <td>42</td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>(/ 108 x)</td>
+        <td>2</td>
+    </tr>
+    </tbody>
+</table>
 
 <p>
-    In the last expression above, note that <code>X</code> is a symbol, not
-    an integer. We have to evaluate the arguments so that
-    <code>builtin_subtract</code> can operate on the integer value bound to
-    <code>X</code> and not the symbol <code>X</code> itself. Similarly
-    the value bound to <code>X</code> is the <em>integer</em> result of
-    evaluating the <em>expression</em> <code>(* 6 9)</code>.
+    In input 4 above, note that <code>X</code> is a symbol, not an integer. We have to evaluate the arguments so that
+    <code>builtin_subtract</code> can operate on the integer value bound to <code>X</code> and not the symbol
+    <code>X</code> itself. Similarly the value bound to <code>X</code> is the <em>integer</em> result of evaluating the
+    <em>expression</em> <code>(* 6 9)</code>.
 </p>
 
+<pre class="go">
+func TestChapter06(t *testing.T) {
+    env := env_create_default()
+
+    for _, tc := range []struct {
+        id     int
+        input  string
+        expect string
+        err    error
+    }{
+        {id: 1, input: "(+ 1 1)", expect: "2"},
+        {id: 2, input: "(define x (* 6 9))", expect: "X"},
+        {id: 3, input: "x", expect: "54"},
+        {id: 4, input: "(- x 12)", expect: "42"},
+        {id: 5, input: "(/ 108 x)", expect: "2"},
+    } {
+        var expr Atom
+        _, err := read_expr([]byte(tc.input), &expr)
+        if err != nil {
+            t.Errorf("%d: read error: want nil: got %v\n", tc.id, err)
+            continue
+        }
+
+        var result Atom
+        err = eval_expr(expr, env, &result)
+
+        if tc.err == nil && err == nil {
+            // yay
+        } else if tc.err == nil && err != nil {
+            t.Errorf("%d: error: want nil: got %v\n", tc.id, err)
+        } else if !errors.Is(err, tc.err) {
+            t.Errorf("%d: error: want %v: got %v\n", tc.id, tc.err, err)
+        }
+        if got := result.String(); tc.expect != got {
+            t.Errorf("%d: eval: want %q: got %q\n", tc.id, tc.expect, got)
+        }
+    }
+}
+</pre>
 <hr/>
 <footer>
     <p>
