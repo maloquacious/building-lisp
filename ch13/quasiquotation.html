@@ -28,27 +28,34 @@
 
 <h4>Example</h4>
 
-<p>
 <pre class="lisp">
 (QUASIQUOTE (+ 1 (UNQUOTE (+ 2 3))))
 </pre>
-evaluates to
+
+<p>
+    evaluates to
+</p>
+
 <pre class="lisp">
 (+ 1 5)
 </pre>
-</p>
 
 <p>
     If we define <code>L</code> to be the list <code>(3 4 5)</code>
     then
+</p>
+
 <pre class="lisp">
 (QUASIQUOTE (1 2 (UNQUOTE-SPLICING L)))
 </pre>
-evaluates to
+
+<p>
+    evaluates to
+</p>
+
 <pre class="lisp">
 (1 2 3 4 5)
 </pre>
-</p>
 
 <h3>Shorthand syntax</h3>
 
@@ -57,7 +64,7 @@ evaluates to
     abbreviations.
 </p>
 
-<table border="1">
+<table>
     <tr>
         <th>Abbreviation</th>
         <th>Equivalent to</th>
@@ -78,14 +85,19 @@ evaluates to
 
 <p>
     Rewriting the examples above with this syntax gives
+</p>
+
 <pre class="lisp">
 `(+ 1 ,(+ 2 3))
 </pre>
-and
+
+<p>
+    and
+</p>
+
 <pre class="lisp">
 `(1 2 ,@L)
 </pre>
-</p>
 
 <h4>Implementation</h4>
 
@@ -93,30 +105,36 @@ and
     We extend the lexer to understand the additional special tokens.
 </p>
 
-<pre class="c">
-int lex(const char *str, const char **start, const char **end)
-{
-	const char *ws = " \t\n";
-	const char *delim = "() \t\n";
-	const char *prefix = "()\'<b>`</b>";
+<pre class="go">
+// lex extracts the next token from the input after skipping
+// comments and leading whitespace. on end of input, it
+// returns nil for both the token and the remainder.
+func lex(input []byte) (token []byte, remainder []byte) {
+    // skip whitespace
+    input = skipws(input)
 
-	str += strspn(str, ws);
+    // check for end of input
+    if len(input) == 0 {
+        return nil, nil
+    }
 
-	if (str[0] == '\0') {
-		*start = *end = NULL;
-		return Error_Syntax;
-	}
+    // check for prefix characters
+    if bytes.IndexByte(prefix, input[0]) >= 0 {
+        token, remainder = input[:1], input[1:]
+        return token, remainder
+    } else if input[0] == ',' {
+        if len(input) > 1 && input[1] == '@' {
+            token, remainder = input[:2], input[2:]
+        } else {
+            token, remainder = input[:1], input[1:]
+        }
+        return token, remainder
+    }
 
-	*start = str;
-
-	if (strchr(prefix, str[0]) != NULL)
-		*end = str + 1;
-	<b>else if (str[0] == ',')
-		*end = str + (str[1] == '@' ? 2 : 1);</b>
-	else
-		*end = str + strcspn(str, delim);
-
-	return Error_OK;
+    // if we get here, the token is a symbol.
+    // collect and return all the characters up to the first delimiter.
+    token, remainder = runto(input, delimiters)
+    return token, remainder
 }
 </pre>
 
@@ -125,29 +143,37 @@ int lex(const char *str, const char **start, const char **end)
     way as <code>QUOTE</code>
 </p>
 
-<pre class="c">
-int read_expr(const char *input, const char **end, Atom *result)
-{
-	.
-	.
-	.
-	if (token[0] == '(') {
-	.
-	.
-	.
-	} else if (token[0] == '`') {
-		*result = cons(make_sym("QUASIQUOTE"), cons(nil, nil));
-		return read_expr(*end, end, &car(cdr(*result)));
-	} else if (token[0] == ',') {
-		*result = cons(make_sym(
-			token[1] == '@' ? "UNQUOTE-SPLICING" : "UNQUOTE"),
-			cons(nil, nil));
-		return read_expr(*end, end, &car(cdr(*result)));
-	} else {
-		.
-		.
-		.
-	}
+<pre class="go">
+// read_expr reads the next expression from the input. an expression is
+// either an atom or a list of expressions. returns the expression along
+// with the remainder of the input and any errors.
+// returns NIL and Error_EndOfInput on end of input. the caller must
+// decide how to handle it.
+// todo: result is not always updated by read. does that lead to bugs later?
+func read_expr(input []byte, result *Atom) (remainder []byte, err error) {
+    .
+    .
+    .
+    switch token[0] {
+    .
+    .
+    .
+    case '`':
+        sym := []byte("QUASIQUOTE")
+        *result = cons(make_sym(sym), cons(_nil, _nil))
+        // set car(cdr(result))
+        return read_expr(rest, &result.value.pair.cdr.value.pair.car)
+    case ',':
+        sym := []byte("UNQUOTE")
+        if len(token) > 1 && token[1] == '@' {
+            sym = []byte("UNQUOTE-SPLICING")
+        }
+        *result = cons(make_sym(sym), cons(_nil, _nil))
+        // set car(cdr(result))
+        return read_expr(rest, &result.value.pair.cdr.value.pair.car)
+    }
+    err = read_atom(token, result)
+    return rest, err
 }
 </pre>
 
@@ -178,7 +204,7 @@ int read_expr(const char *input, const char **end, Atom *result)
   (if (pair? x)
       (if (eq? (car x) 'unquote)
           (cadr x)
-          (if (eq? (caar x) 'unquote-splicing)
+          (if (eq? (if (pair? (car x)) (caar x) nil) 'unquote-splicing)
               (list 'append
                     (cadr (car x))
                     (list 'quasiquote (cdr x)))
@@ -187,6 +213,10 @@ int read_expr(const char *input, const char **end, Atom *result)
                     (list 'quasiquote (cdr x)))))
       (list 'quote x)))
 </pre>
+
+<p>
+    (Note: the definition above includes a fix from [building-lisp-zig](https://github.com/jpaquim/building-lisp-zig).
+</p>
 
 <p>
     The definition above is a little hard to follow, since the
@@ -198,16 +228,24 @@ int read_expr(const char *input, const char **end, Atom *result)
     Quasiquotation allows us to make the body of a macro look like
     the expression it returns; for example the <code>IGNORE</code>
     macro in chapter 11
+</p>
+
 <pre class="lisp">
 (DEFMACRO (IGNORE X)
   (CONS 'QUOTE (CONS X NIL)))
 </pre>
-can now be written
+
+<p>
+    can now be written
+</p>
+
 <pre class="lisp">
 (DEFMACRO (IGNORE X)
   `(QUOTE ,X))
 </pre>
-and the operation is made clear.
+
+<p>
+    and the operation is made clear.
 </p>
 
 <h4>Testing</h4>
@@ -226,13 +264,14 @@ L
 <p>
     We will now use <code>QUASIQUOTE</code> to define a new special
     form:
+</p>
+
 <pre class="lisp">
 (LET ((<i>sym1 expr1</i>)
       (<i>sym2 expr2</i>)
       ...)
   <i>body</i>...)
 </pre>
-</p>
 
 <p>
     <code>LET</code> causes the expressions <code>expr</code> to be evaluated
@@ -256,15 +295,20 @@ L
 
 <p>
     When we evaluate the form
+</p>
+
 <pre class="lisp">
 (LET ((X 3) (Y 5)) (+ X Y))
 </pre>
-it is transformed by the <code>LET</code> macro into
+
+<p>
+    it is transformed by the <code>LET</code> macro into
+</p>
+
 <pre class="lisp">
 ((LAMBDA (X Y) (+ X Y)) 3 5)
 </pre>
 which behaves as desired.
-</p>
 
 <h4>Testing</h4>
 
@@ -310,6 +354,50 @@ Symbol not bound
     the interpreter.
 </p>
 
+<pre class="go">
+func TestChapter13(t *testing.T) {
+    env := env_create_default()
+    if err := load_file(env, "library.lisp"); err != nil {
+        t.Errorf("error: want nil: got %v\n", err)
+    }
+
+    for _, tc := range []struct {
+        id     int
+        input  string
+        expect string
+        err    error
+    }{
+        {id: 1, input: "`(+ 1 ,(+ 2 3))", expect: "(+ 1 5)"},
+        {id: 2, input: "(define l '(3 4 5))", expect: "L"},
+        {id: 3, input: "`(1 2 ,@l)", expect: "(1 2 3 4 5)"},
+        {id: 4, input: "(let ((x 3) (y 5)) (+ x y))", expect: "8"},
+        {id: 5, input: "x", expect: "NIL", err: Error_Unbound},
+        {id: 6, input: "(+ 1 2 3 4)", expect: "10"},
+    } {
+        var expr Atom
+        _, err := read_expr([]byte(tc.input), &expr)
+        if err != nil {
+            t.Errorf("%d: read error: want nil: got %v\n", tc.id, err)
+            continue
+        }
+
+        var result Atom
+        err = eval_expr(expr, env, &result)
+
+        if tc.err == nil && err == nil {
+            // yay
+        } else if tc.err == nil && err != nil {
+            t.Errorf("%d: error: want nil: got %v\n", tc.id, err)
+        } else if !errors.Is(err, tc.err) {
+            t.Errorf("%d: error: want %v: got %v\n", tc.id, tc.err, err)
+        }
+        if got := result.String(); tc.expect != got {
+            t.Errorf("%d: eval: want %q: got %q\n", tc.id, tc.expect, got)
+        }
+    }
+}
+</pre>
+
 <hr/>
 <footer>
     <p>
@@ -322,4 +410,3 @@ Symbol not bound
 
 </body>
 </html>
-
