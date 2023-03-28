@@ -7,6 +7,12 @@
 </head>
 <body>
 
+<p>
+    Go is a garbage collected language, so we don't need to implement our own GC.
+    This chapter shows a GC for the C programming language.
+</p>
+
+
 <h1>Garbage collection</h1>
 
 <p>
@@ -23,30 +29,30 @@
 
 <pre class="c">
 struct Allocation {
-	struct Pair pair;
-	int mark : 1;
-	struct Allocation *next;
+    struct Pair pair;
+    int mark : 1;
+    struct Allocation *next;
 };
 
 struct Allocation *global_allocations = NULL;
 
 Atom cons(Atom car_val, Atom cdr_val)
 {
-	struct Allocation *a;
-	Atom p;
+    struct Allocation *a;
+    Atom p;
 
-	a = malloc(sizeof(struct Allocation));
-	a->mark = 0;
-	a->next = global_allocations;
-	global_allocations = a;
+    a = malloc(sizeof(struct Allocation));
+    a->mark = 0;
+    a->next = global_allocations;
+    global_allocations = a;
 
-	p.type = AtomType_Pair;
-	p.value.pair = &amp;a->pair;
+    p.type = AtomType_Pair;
+    p.value.pair = &amp;a->pair;
 
-	car(p) = car_val;
-	cdr(p) = cdr_val;
+    car(p) = car_val;
+    cdr(p) = cdr_val;
 
-	return p;
+    return p;
 }
 </pre>
 
@@ -57,24 +63,24 @@ Atom cons(Atom car_val, Atom cdr_val)
 <pre class="c">
 void gc_mark(Atom root)
 {
-	struct Allocation *a;
+    struct Allocation *a;
 
-	if (!(root.type == AtomType_Pair
-		|| root.type == AtomType_Closure
-		|| root.type == AtomType_Macro))
-		return;
+    if (!(root.type == AtomType_Pair
+        || root.type == AtomType_Closure
+        || root.type == AtomType_Macro))
+        return;
 
-	a = (struct Allocation *)
-		((char *) root.value.pair
-			- offsetof(struct Allocation, pair));
+    a = (struct Allocation *)
+        ((char *) root.value.pair
+            - offsetof(struct Allocation, pair));
 
-	if (a->mark)
-		return;
+    if (a->mark)
+        return;
 
-	a->mark = 1;
+    a->mark = 1;
 
-	gc_mark(car(root));
-	gc_mark(cdr(root));
+    gc_mark(car(root));
+    gc_mark(cdr(root));
 }
 </pre>
 
@@ -87,28 +93,28 @@ void gc_mark(Atom root)
 <pre class="c">
 void gc()
 {
-	struct Allocation *a, **p;
+    struct Allocation *a, **p;
 
-	gc_mark(sym_table);
+    gc_mark(sym_table);
 
-	/* Free unmarked allocations */
-	p = &global_allocations;
-	while (*p != NULL) {
-		a = *p;
-		if (!a->mark) {
-			*p = a->next;
-			free(a);
-		} else {
-			p = &amp;a->next;
-		}
-	}
+    /* Free unmarked allocations */
+    p = &amp;global_allocations;
+    while (*p != NULL) {
+        a = *p;
+        if (!a->mark) {
+            *p = a->next;
+            free(a);
+        } else {
+            p = &amp;a->next;
+        }
+    }
 
-	/* Clear marks */
-	a = global_allocations;
-	while (a != NULL) {
-		a->mark = 0;
-		a = a->next;
-	}
+    /* Clear marks */
+    a = global_allocations;
+    while (a != NULL) {
+        a->mark = 0;
+        a = a->next;
+    }
 }
 </pre>
 
@@ -122,22 +128,22 @@ void gc()
 <pre class="c">
 int eval_expr(Atom expr, Atom env, Atom *result)
 {
-	static int count = 0;
-	Error err = Error_OK;
-	Atom stack = nil;
+    static int count = 0;
+    Error err = Error_OK;
+    Atom stack = nil;
 
-	do {
-		if (++count == 100000) {
-			gc_mark(expr);
-			gc_mark(env);
-			gc_mark(stack);
-			gc();
-			count = 0;
-		}
+    do {
+        if (++count == 100000) {
+            gc_mark(expr);
+            gc_mark(env);
+            gc_mark(stack);
+            gc();
+            count = 0;
+        }
 
-	.
-	.
-	.
+    .
+    .
+    .
 }
 </pre>
 
@@ -160,12 +166,12 @@ T
 
 <hr/>
 <footer>
-	<p>
-		** <a href="../index.html">Home Page</a>
-		** <a href="../ch14/continuations.html">Chapter 14: Continuations and tail recursion</a>
-		** <a href="../ch16/next.html">Chapter 16: Where do we go from here?</a>
-		**
-	</p>
+    <p>
+        ** <a href="../index.html">Home Page</a>
+        ** <a href="../ch14/continuations.html">Chapter 14: Continuations and tail recursion</a>
+        ** <a href="../ch16/next.html">Chapter 16: Where do we go from here?</a>
+        **
+    </p>
 </footer>
 
 </body>
