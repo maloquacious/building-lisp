@@ -14,70 +14,40 @@
     our LISP system. Rather than creating new builtins for each one,
     let's take advantage of the fact that much of the LISP standard
     library can be implemented in LISP itself in terms of lower-level
-    fuctions.
+    functions.
 </p>
 
 <p>
     First we need a function to read the library definitions from disk.
-</p>
-
-<pre class="c">
-char *slurp(const char *path)
-{
-	FILE *file;
-	char *buf;
-	long len;
-
-	file = fopen(path, "r");
-	if (!file)
-		return NULL;
-	fseek(file, 0, SEEK_END);
-	len = ftell(file);
-	fseek(file, 0, SEEK_SET);
-
-	buf = malloc(len + 1);
-	if (!buf)
-		return NULL;
-
-	fread(buf, 1, len, file);
-	buf[len] = 0;
-	fclose(file);
-
-	return buf;
-}
-</pre>
-
-<p>
     And a routine, similar to our REPL in <code>main</code>, to
     process the definitions. Because we read the whole file in one
     go, there is no problem with splitting definitions over several
     lines.
 </p>
 
-<pre class="c">
-void load_file(Atom env, const char *path)
-{
-	char *text;
+<pre class="go">
+func load_file(env Atom, path string) error {
+    fmt.Printf("Reading %s...\n", path)
+    input, err := os.ReadFile(path)
+    if err != nil {
+        return err
+    }
 
-	printf("Reading %s...\n", path);
-	text = slurp(path);
-	if (text) {
-		const char *p = text;
-		Atom expr;
-		while (read_expr(p, &amp;p, &amp;expr) == Error_OK) {
-			Atom result;
-			Error err = eval_expr(expr, env, &amp;result);
-			if (err) {
-				printf("Error in expression:\n\t");
-				print_expr(expr);
-				putchar('\n');
-			} else {
-				print_expr(result);
-				putchar('\n');
-			}
-		}
-		free(text);
-	}
+    var expr Atom
+    rest, err := read_expr(input, &expr)
+    for ; err == nil; rest, err = read_expr(rest, &expr) {
+        var result Atom
+        if err := eval_expr(expr, env, &result); err != nil {
+            fmt.Printf("error: %s in expression:\n\t%s\n", err, expr.String())
+        } else {
+            fmt.Printf("%s\n", result.String())
+        }
+    }
+    if err != nil && err != Error_EndOfInput {
+        fmt.Printf("error: %s in expression:\n\t%s\n", err, expr.String())
+    }
+
+    return nil
 }
 </pre>
 
@@ -85,24 +55,15 @@ void load_file(Atom env, const char *path)
     Finally read in the library after setting up the builtins.
 </p>
 
-<pre class="c">
-int main(int argc, char **argv)
-{
-	.
- 	.
-	.
-
-	/* Set up the initial environment */
-	.
-	.
-	.
-
-	<b>load_file(env, "library.lisp");</b>
-
-	/* Main loop */
-	.
-	.
-	.
+<pre class="go">
+func TestChapter12(t *testing.T) {
+    env := env_create_default()
+    if err := load_file(env, "library.lisp"); err != nil {
+        t.Errorf("error: want nil: got %v\n", err)
+    }
+    .
+     .
+    .
 }
 </pre>
 
@@ -110,21 +71,26 @@ int main(int argc, char **argv)
 
 <p>
     Create <code>library.lisp</code> with the following definition:
+</p>
+
 <pre class="lisp">
 (define (abs x) (if (&lt; x 0) (- x) x))
 </pre>
-</p>
 
 <p>
     And run the interpreter:
+</p>
+
 <pre class="lisp">
 Reading library.lisp...
 ABS
 &gt; <b>(abs -2)</b>
 2
 </pre>
-The <code>ABS</code> function will now be available in every session
-without having to define it each time.
+
+<p>
+    The <code>ABS</code> function will now be available in every session
+    without having to define it each time.
 </p>
 
 <h2><code>fold</code></h2>
@@ -151,7 +117,7 @@ without having to define it each time.
 
 <p>
     See
-    <a href="http://en.wikipedia.org/wiki/Fold_(higher-order_function)">
+    <a href="https://en.wikipedia.org/wiki/Fold_(higher-order_function)">
         the internet</a> for more details.
 </p>
 
@@ -199,28 +165,30 @@ without having to define it each time.
 
 <p>
     The <code>apply</code> function:
+</p>
+
 <pre class="lisp">
 (APPLY <i>fn arg-list</i>)
 </pre>
-calls <code>fn</code> with the arguments bound to the values in the
-list <code>arg-list</code>.
+
+<p>
+    calls <code>fn</code> with the arguments bound to the values in the
+    list <code>arg-list</code>.
 </p>
 
-<pre class="c">
-int builtin_apply(Atom args, Atom *result)
-{
-	Atom fn;
-
-	if (nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))))
-		return Error_Args;
-
-	fn = car(args);
-	args = car(cdr(args));
-
-	if (!listp(args))
-		return Error_Syntax;
-
-	return apply(fn, args, result);
+<pre class="go">
+// builtin_apply makes our native apply function available to the interpreter.
+// note that the result may not be updated if we find errors.
+func builtin_apply(args Atom, result *Atom) error {
+    // verify number and type of arguments
+    if nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))) {
+        return Error_Args
+    }
+    fn, args := car(args), car(cdr(args))
+    if !listp(args) {
+        return Error_Syntax
+    }
+    return apply(fn, args, result)
 }
 </pre>
 
@@ -230,44 +198,64 @@ int builtin_apply(Atom args, Atom *result)
     <code>eq?</code> tests whether two atoms refer to the same object.
 </p>
 
-<pre class="c">
-int builtin_eq(Atom args, Atom *result)
-{
-	Atom a, b;
-	int eq;
+<pre class="go">
+// builtin_eq tests whether two atoms refer to the same object.
+// note that the result may not be updated if we find errors.
+func builtin_eq(args Atom, result *Atom) error {
+    // verify number and type of arguments
+    if nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))) {
+        return Error_Args
+    }
 
-	if (nilp(args) || nilp(cdr(args)) || !nilp(cdr(cdr(args))))
-		return Error_Args;
-
-	a = car(args);
-	b = car(cdr(args));
-
-	if (a.type == b.type) {
-		switch (a.type) {
-		case AtomType_Nil:
-			eq = 1;
-			break;
-		case AtomType_Pair:
-		case AtomType_Closure:
-		case AtomType_Macro:
-			eq = (a.value.pair == b.value.pair);
-			break;
-		case AtomType_Symbol:
-			eq = (a.value.symbol == b.value.symbol);
-			break;
-		case AtomType_Integer:
-			eq = (a.value.integer == b.value.integer);
-			break;
-		case AtomType_Builtin:
-			eq = (a.value.builtin == b.value.builtin);
-			break;
-		}
-	} else {
-		eq = 0;
-	}
-
-	*result = eq ? make_sym("T") : nil;
-	return Error_OK;
+    // todo: should be able to assume that T is in the environment
+    a, b, t := car(args), car(cdr(args)), make_sym([]byte{'T'})
+    if a._type != b._type {
+        *result = _nil
+        return nil
+    }
+    switch a._type {
+    case AtomType_Nil:
+        *result = t
+    case AtomType_Builtin:
+        if a.value.builtin != b.value.builtin {
+            *result = _nil
+        } else {
+            *result = t
+        }
+    case AtomType_Closure:
+        if a.value.pair != b.value.pair {
+            *result = _nil
+        } else {
+            *result = t
+        }
+    case AtomType_Integer:
+        if a.value.integer != b.value.integer {
+            *result = _nil
+        } else {
+            *result = t
+        }
+    case AtomType_Macro:
+        if a.value.pair != b.value.pair {
+            *result = _nil
+        } else {
+            *result = t
+        }
+    case AtomType_Pair:
+        if a.value.pair != b.value.pair {
+            *result = _nil
+        } else {
+            *result = t
+        }
+    case AtomType_Symbol:
+        if a.value.symbol != b.value.symbol {
+            *result = _nil
+        } else {
+            *result = t
+        }
+    default:
+        panic(fmt.Sprintf("assert(_type != %d)", a._type))
+    }
+    return nil
 }
 </pre>
 
@@ -277,25 +265,43 @@ int builtin_eq(Atom args, Atom *result)
     Tests whether an atom is a pair.
 </p>
 
-<pre class="c">
-int builtin_pairp(Atom args, Atom *result)
-{
-	if (nilp(args) || !nilp(cdr(args)))
-		return Error_Args;
+<pre class="go">
+// builtin_pairp tests whether an atom is a pair.
+// note that the result may not be updated if we find errors.
+func builtin_pairp(args Atom, result *Atom) error {
+    // verify number and type of arguments
+    if nilp(args) || !nilp(cdr(args)) {
+        return Error_Args
+    }
 
-	*result = (car(args).type == AtomType_Pair) ? make_sym("T") : nil;
-	return Error_OK;
+    if car(args)._type != AtomType_Pair {
+        *result = _nil
+    } else {
+        *result = make_sym([]byte{'T'})
+    }
+    return nil
 }
 </pre>
 
 <p>
     Don't forget to add bindings for these to the initial environment.
-<pre class="c">
-env_set(env, make_sym("APPLY"), make_builtin(builtin_apply));
-env_set(env, make_sym("EQ?"), make_builtin(builtin_eq));
-env_set(env, make_sym("PAIR?"), make_builtin(builtin_pairp));
-</pre>
 </p>
+
+<pre class="go">
+// env_create_default creates a new environment with some native
+// functions added to the symbol table.
+func env_create_default() Atom {
+    .
+    .
+    .
+    _ = env_set(env, make_sym([]byte("APPLY")), make_builtin(builtin_apply))
+    _ = env_set(env, make_sym([]byte("EQ?")), make_builtin(builtin_eq))
+    _ = env_set(env, make_sym([]byte("PAIR?")), make_builtin(builtin_pairp))
+
+    // return the new environment
+    return env
+}
+</pre>
 
 <h2><code>map</code></h2>
 
@@ -339,14 +345,55 @@ env_set(env, make_sym("PAIR?"), make_builtin(builtin_pairp));
     <code>(+ 3 6)</code>.
 </p>
 
+<pre class="go">
+func TestChapter12(t *testing.T) {
+    env := env_create_default()
+    if err := load_file(env, "library.lisp"); err != nil {
+        t.Errorf("error: want nil: got %v\n", err)
+    }
+
+    for _, tc := range []struct {
+        id     int
+        input  string
+        expect string
+        err    error
+    }{
+        {id: 1, input: "(abs -2)", expect: "2"},
+        {id: 2, input: "(list (+ 3 5) 'foo)", expect: "(8 FOO)"},
+        {id: 3, input: "(reverse '(1 2 3))", expect: "(3 2 1)"},
+        {id: 4, input: "(map + '(1 2 3) '(4 5 6))", expect: "(5 7 9)"},
+    } {
+        var expr Atom
+        _, err := read_expr([]byte(tc.input), &expr)
+        if err != nil {
+            t.Errorf("%d: read error: want nil: got %v\n", tc.id, err)
+            continue
+        }
+
+        var result Atom
+        err = eval_expr(expr, env, &result)
+
+        if tc.err == nil && err == nil {
+            // yay
+        } else if tc.err == nil && err != nil {
+            t.Errorf("%d: error: want nil: got %v\n", tc.id, err)
+        } else if !errors.Is(err, tc.err) {
+            t.Errorf("%d: error: want %v: got %v\n", tc.id, tc.err, err)
+        }
+        if got := result.String(); tc.expect != got {
+            t.Errorf("%d: eval: want %q: got %q\n", tc.id, tc.expect, got)
+        }
+    }
+}
+</pre>
 <hr/>
 <footer>
-	<p>
-		** <a href="../index.html">Home Page</a>
-		** <a href="../ch11/macros.html">Chapter 11: Macros</a>
-		** <a href="../ch13/quasiquotation.html">Chapter 13: Quasiquotation</a>
-		**
-	</p>
+    <p>
+        ** <a href="../index.html">Home Page</a>
+        ** <a href="../ch11/macros.html">Chapter 11: Macros</a>
+        ** <a href="../ch13/quasiquotation.html">Chapter 13: Quasiquotation</a>
+        **
+    </p>
 </footer>
 
 </body>
